@@ -22,15 +22,40 @@
 
 * Libraries
 
-   * Etaoin
+** Etaoin
       WebDriver protocol implementation:
      * Chrome/Firefox automation with human-like interaction timings
      * Screenshot-based debugging for anti-bot challenges
 
-   * Abrade
+** Abrade for JavaScript rendering when required
       HtmlUnit-based scraper for JS-heavy Substack pages:
      * Full browser emulation with CSS/JS execution
      * Headless mode support for server environments
+
+** Hato/clj-http for HTTP with rotating proxies
+
+** Throttler + Safely for adaptive rate control
+
+** Reaver for HTML parsing
+    * JSoup wrapper optimized for data extraction from HTML:
+    * CSS selector syntax with extract-from macro
+    * Converts HTML tables to Clojure vectors automatically
+    * Handles malformed HTML common in older Substack themes
+
+    Substack scraping example:
+      #+begin_src clojure
+      (extract-from (reaver/parse html-content)
+        ".post" [:title :content :date]
+        "h1.post-title" text
+        "div.post-content" text
+        "time.post-date" (attr :datetime))
+      #+end_src
+
+** Enlive for HTML parsing
+      Templating-focused library with powerful selector engine:
+      * select function uses CSS-like syntax for DOM traversal
+      * Built-in text extraction and attribute parsing
+      * Used in production by large-scale scrapers handling 10k+ pages/day
 
 * Snippets
 

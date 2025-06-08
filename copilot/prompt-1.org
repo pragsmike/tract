@@ -1,0 +1,4 @@
+Read the given design doc.
+Don't generate code, or any other artifacts just yet.
+Analyze the design doc to find inconsistencies in what it specifies.
+

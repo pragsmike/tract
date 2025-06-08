@@ -1,0 +1,128 @@
+Our task is to extract content from Substack HTML pages.
+We will interchangably call these pages, articles, posts, or source pages.
+
+The text of the articles is to be placed in Markdown-format files,
+suitable for ingestion by LLMs.  Images will also be extracted
+and stored alongside the text in a way that makes it obvious
+which article they came from.  These images will also be given to LLMs.
+
+
+* Access to the Substack Service
+
+Some of the pages are free, available to everyone with no authentication.
+Other pages are available only to subscribers.  We have subscriptions to those,
+and have the authentication credentials.
+
+We must avoid being throttled or banned by the Substack service.
+For that, we employ
+   * throttling on our end, limiting requests to a small number per minute.
+   * using different user-agent fields.
+   * respecting robots.txt and robots headers in the responses from Substack.
+   * optionally, using proxy servers to send the requests to Substack.
+
+A Substack page is fetched by an HTTP GET request for a text/html document.
+
+* Use cases
+** Text ingested by LLM
+   The LLM will ingest only the Markdown text extracted from the articles.
+   It will know the name of the article, the author, the date of publication, and the text content.
+   The text will contain links to external URLs, and to images encountered in the article,
+   which will have been stored as described below.
+
+** Images ingested by LLM
+   The multimodal LLM will ingest one or more images.
+   It will know the name of the article(s) that referenced the image, their author(s),
+   and their date(s) of publication.
+   It must be possible for the LLM to fetch, or at least ask for, the referring articles by name.
+
+* Architecture
+
+  We want a command-line program that can accept arguments, as implied below.
+
+  We need two functions. One is given a substack author's name, and an optional
+  date range. If the date range is omitted, it means the ten most recent
+  articles by that author. This function could use Substack's Atom feed for that
+  author. The output is a list of URLs of the articles by that author whose
+  publication date lies within the date range.
+
+  The second function is given a list of URLs, and produces a set of files
+  that hold the content extracted from the articles found at those URLs.
+  The content extracted is summarized here, with details specified in the next section.
+  * the textual content of the body, as markdown, with images and links preserved.
+    All the text is to be contained in that one file.
+  * the images that are linked in the text, one per file, along with metadata
+    that includes the image URL, the caption it appeared with in the article,
+    and the URL of the article that referenced it.
+
+* Output format
+
+  For each article, we derive a unique, readable textual key that can serve as the prefix of the filenames.
+  This key could be a shortened version of the article title, with unsafe characters removed.
+  The textual content of the article is stored in a Markdown-format file, suffix .md, whose name
+  is prefixed by that key.  All the text in the article is to appear in that one file.
+
+  If the source page contains section headings, they are to be preserved as headings in the Markdown file.
+
+** Image references
+
+  Image references in the article will appear as image references in the Markdown file.
+  These are to be translated so they point at the image as stored alongside the Markdown file.
+
+  The image itself will be fetched and stored in a file whose name is the file part of the URL
+  it came from, under a directory whose name is the host part of that URL.
+
+  For example, supposed the article is named "Skunk".  The Markdown file containing its
+  text will be named 'Skunk.md'.  Suppose further that the article had an inline image reference
+
+  <img src="https://example.com/sunset.jpg" alt="A beautiful sunset" title="Sunset Image">
+
+  That would appear in the Markdown file as
+
+  ![A beautiful sunset](example.com/sunset.jpg "Sunset Image")
+
+  and that sunset.jpg file will have been stored in a directory 'example.com' alongside Skunk.md.
+
+
+  It is possible, but not expected to be very common, that the same image will be referenced
+  by multiple articles.  The image itself will be the same, stored in the same place,
+  and need only be fetched once from its source URL.  However, the reference to it in each of the
+  articles will in general be different.  The interesting info is the caption that appeared with
+  the image, the title, the alt text, and the URL of the article that referenced it.
+
+  Therefore for each image reference in an article, we will create a JSON file that holds
+  those items alongside the image file.  That JSON file will be named using the article's textual key
+  as described above, along with a small integer to make it unique in case the article refers
+  to the image more than once.
+
+  For example, the JSON file for the image above would look like this:
+  #+begin_src json
+    {
+    "article": "Skunk.md",
+    "alt": "A beautiful sunset",
+    "title": "Sunset Image",
+    "caption": "To be determined"
+    }
+  #+end_src
+
+
+** Links
+
+  Links to URLs in the article will appear as links in the Markdown file.
+
+
+* Implementation
+
+The implementation code is Clojure.  We use standard good coding practices,
+preferring functional code over stateful code.
+
+We use standard Clojure libraries.
+Etaoin is a library that uses the WebDriver protocol to drive web browsers.
+This reduces the possibility of being throttled or restricted by Substack,
+as it shows fewer signs of being a bot.
+
+For parsing the HTML content, we will use either Reaver or Enlive.
+The latter is known to work.  We will have to evaluate them both.
+For now, let's assume we'll use Enlive, but keep the possibility open.
+
+
+
