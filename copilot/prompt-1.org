@@ -1,4 +1,35 @@
 Read the given design doc.
 Don't generate code, or any other artifacts just yet.
 Analyze the design doc to find inconsistencies in what it specifies.
+I will update the document to correct whatever flaws we find.
+Then we will converse about how to proceed.
 
+For reference, the plan now is to proceed in steps, as outlined below.  We will
+refine these steps as we gain more information, which is what the first
+steps are intended to do.
+
+1) create a prototype Clojure project that references the libraries that we know
+   in a deps.edn file.  This program will fetch a page so that we can inspect it
+   to discover how the HTML is structured, so we can devise a plan for extracting
+   the text from it.  It is possible that the page will have an iframe, or more.
+   We'll identify how the article text is nested under the body element, and how
+   it is marked up, so that we can devise a strategy for selecting just the text
+   elements.  For example, we might note what element id's or classes are used
+   on the enclosing elements, whether they are p elements, div elements, etc.
+
+2) Using that knowledge, we will document our strategy for selecting just the body text.
+
+3) We will write code that applies our strategy to that first page we fetched.
+   If it fails, we'll repeat our analysis.
+   If it succeeds, we'll go on to the next step.
+
+4) We will read a different page by the same author, and see if the strategy succeeds on that page.
+   If it fails, we'll repeat our analysis.
+   If it succeeds, we'll go on to the next step.
+
+5) Devise and document logic for reliably extracting the caption for each image
+   referenced in the article.
+
+6) Devise a plan to implement the documented design.
+
+7) Implement that plan.

@@ -11,7 +11,9 @@ which article they came from.  These images will also be given to LLMs.
 
 Some of the pages are free, available to everyone with no authentication.
 Other pages are available only to subscribers.  We have subscriptions to those,
-and have the authentication credentials.
+and have the authentication credentials.  These credentials will be stored
+in a config.edn file that is excluded from version control, as is commonly
+done for database and website credentials.
 
 We must avoid being throttled or banned by the Substack service.
 For that, we employ
@@ -57,9 +59,33 @@ A Substack page is fetched by an HTTP GET request for a text/html document.
 * Output format
 
   For each article, we derive a unique, readable textual key that can serve as the prefix of the filenames.
-  This key could be a shortened version of the article title, with unsafe characters removed.
+  We will use this key to generate the names of files where we will store the extracted content.
+
+  This key is a "slugified" version of the article title (shortened, with unsafe characters removed)
+  prefixed by the date, as in 'YYYY-MM-DD_slugified-title'.
+
+  For example, an article "My Thoughts on Skunks" published on Oct 27, 2023
+  could have the key 2023-10-27_my-thoughts-on-skunks
+
+** Body text
+
   The textual content of the article is stored in a Markdown-format file, suffix .md, whose name
   is prefixed by that key.  All the text in the article is to appear in that one file.
+
+  The front matter of the file contains metadata in TOML format about the article from which it was extracted,
+  including the title, author, article_key, publication_date, source_url.
+
+  #+begin_src text
+    ---
+    title: "Skunk"
+    author: "John Doe"
+    article_key: "2023-10-27_skunk"
+    publication_date: "2023-10-27"
+    source_url: "https://johndoe.substack.com/p/skunk"
+    ---
+
+    The rest of the article content in Markdown...
+  #+end_src
 
   If the source page contains section headings, they are to be preserved as headings in the Markdown file.
 
@@ -70,9 +96,10 @@ A Substack page is fetched by an HTTP GET request for a text/html document.
 
   The image itself will be fetched and stored in a file whose name is the file part of the URL
   it came from, under a directory whose name is the host part of that URL.
+  If there is a query string, it should be removed.
 
   For example, supposed the article is named "Skunk".  The Markdown file containing its
-  text will be named 'Skunk.md'.  Suppose further that the article had an inline image reference
+  text will be named '2023-10-27_skunk.md'.  Suppose further that the article had an inline image reference
 
   <img src="https://example.com/sunset.jpg" alt="A beautiful sunset" title="Sunset Image">
 
@@ -97,13 +124,22 @@ A Substack page is fetched by an HTTP GET request for a text/html document.
   For example, the JSON file for the image above would look like this:
   #+begin_src json
     {
-    "article": "Skunk.md",
-    "alt": "A beautiful sunset",
-    "title": "Sunset Image",
-    "caption": "To be determined"
+      "article_key": "2023-10-27_skunk",
+      "source_article_url": "https://...",
+      "image_path": "example.com/sunset.jpg",
+      "image_source_url": "https://example.com/sunset.jpg",
+      "alt": "A beautiful sunset",
+      "title": "Sunset Image",
+      "caption": "A beautiful sunset over the mountains."
     }
   #+end_src
 
+*** Image Captions
+   While some description of the image can be found in the IMG tag, finding the caption
+   will require inspection of the surrounding HTML.
+   Substack articles often have captions in separate HTML elements (e.g., a
+   <figcaption> or a <div> with a specific class) that are siblings to the <img>'s
+   parent container.
 
 ** Links
 
