@@ -1,0 +1,59 @@
+#+TITLE: Tract
+
+* Tract: Extract content
+
+  Text, image, video link, and other links.
+
+  Focus on Substack to begin with.
+
+  Input: Author, date range
+  Output: For each post, a directory
+          * body text
+          * for each image
+            * image, caption
+          * for each link
+            * href
+            * anchor text
+
+
+** Decomposition
+  Input:  author and date range
+  Output: list of URLs of posts
+
+* Libraries
+
+   * Etaoin
+      WebDriver protocol implementation:
+     * Chrome/Firefox automation with human-like interaction timings
+     * Screenshot-based debugging for anti-bot challenges
+
+   * Abrade
+      HtmlUnit-based scraper for JS-heavy Substack pages:
+     * Full browser emulation with CSS/JS execution
+     * Headless mode support for server environments
+
+* Snippets
+
+  #+begin_src clojure
+  (def driver (etaoin/start-chrome))
+  (etaoin/go driver "https://substack.com")
+  (let [posts (etaoin/query-all driver {:class "post"})]
+    (map etaoin/get-text-el posts))
+  #+end_src
+
+* Substack-Specific Considerations
+** Architecture Patterns
+*** Incremental scraping:
+
+  * Use Substack’s /archive pagination with exponential backoff
+  * Track Last-Modified headers to avoid redundant requests
+
+*** Atom feed parsing:
+
+    #+begin_src clojure
+    (feed/parse-substack-feed "https://user.substack.com/feed")
+    #+end_src
+
+*** Image handling:
+  * Lazy-load avoidance with window.scroll emulation
+  * Referer header spoofing for hotlinked assets
