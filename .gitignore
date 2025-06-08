@@ -2,3 +2,7 @@
 *.swp
 *.bak
 ?
+.clj-kondo
+.env
+.lsp
+.cpcache

@@ -16,9 +16,44 @@
             * anchor text
 
 
-** Decomposition
-  Input:  author and date range
-  Output: list of URLs of posts
+* Install chrome and chrome driver
+
+  #+begin_src bash
+  sudo apt update && sudo apt upgrade -y
+  #+end_src
+
+  #+begin_src bash
+  sudo apt install wget curl gnupg -y
+  sudo apt install libgbm1 libu2f-udev libwayland-server0
+  #+end_src
+
+  #+begin_src bash
+  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+  #+end_src
+
+  #+begin_src bash
+  sudo apt install ./google-chrome-stable_current_amd64.deb
+  #+end_src
+
+  #+begin_src bash
+    google-chrome --version
+    google-chrome --no-sandbox
+    google-chrome --headless --disable-gpu --screenshot https://www.chromestatus.com/
+  #+end_src
+
+** chrome driver
+  Crucial Prerequisite: WebDriver
+  Etaoin doesn't control the browser directly. It speaks the "WebDriver" protocol to a small executable provided by the browser vendor. You need to install this driver.
+  Recommendation: Use chromedriver, as it's the most common.
+
+*** How to Install:
+  * Find your Chrome browser version (Go to chrome://settings/help).
+  * Download the matching chromedriver version from the Chrome for Testing
+    availability dashboard.
+  * Unzip the downloaded file.
+  * Place the chromedriver executable (or chromedriver.exe on Windows) in a
+    directory that is on your system's PATH. (On macOS/Linux, /usr/local/bin is
+    a common choice).
 
 * Libraries
 
