@@ -22,19 +22,49 @@
                          (subs published-date-raw 0 10))
      :source_url (:url parsed-json)}))
 
+(defn extract-body-html
+  "Selects the main article, removes unwanted elements, and returns it as an HTML string."
+  [html-resource]
+  (let [article-selector [[:article.newsletter-post]]
+        selectors-to-remove [[:div.share-dialog]
+                             [:div.subscribe-widget]
+                             [:p.button-wrapper]
+                             [:div.post-footer]
+                             [:div.post-ufi]
+                             [:div#discussion]]
+
+        ;; 1. Select the article nodes to start with.
+        initial-nodes (html/select html-resource article-selector)
+
+        ;; 2. Use `reduce` to apply one transformation for each selector.
+        ;; This chains the transforms: transform(transform(transform(nodes, s1), s2), s3)...
+        cleaned-nodes (reduce
+                        (fn [nodes-so-far selector]
+                          (html/transform nodes-so-far selector (constantly nil)))
+                        initial-nodes
+                        selectors-to-remove)]
+
+    ;; 3. Emit the final, cleaned nodes back to an HTML string.
+    (html/emit* cleaned-nodes)))
+
+
 (defn -main
-  "Reads a local HTML file, extracts article metadata, and prints it."
+  "Reads a local HTML file, extracts content, and prints it."
   [& args]
   (println "-> Reading and parsing local file:" test-html-file)
   (try
     (let [html-string (slurp test-html-file)
-          ;; Use a StringReader for Enlive to parse from the string
           html-resource (html/html-resource (StringReader. html-string))
-          metadata (extract-metadata html-resource)]
+          metadata (extract-metadata html-resource)
+          body-html-seq (extract-body-html html-resource)]
 
       (println "\n--- EXTRACTED METADATA ---")
       (pp/pprint metadata)
-      (println "--------------------------"))
+      (println "--------------------------")
+
+      (println "\n--- CLEANED ARTICLE HTML ---")
+      (doseq [s body-html-seq] (print s))
+      (println "\n----------------------------"))
     (catch java.io.FileNotFoundException e
       (println "\nERROR: File not found ->" (.getMessage e))
       (println "Please ensure 'test/page-1.html' exists."))))
