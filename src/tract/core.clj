@@ -1,37 +1,40 @@
 (ns tract.core
-  (:require [etaoin.api :as e])
-  (:import [java.nio.file Files]
-           [java.nio.file.attribute FileAttribute])
+  (:require [net.cgrand.enlive-html :as html]
+            [cheshire.core :as json]
+            [clojure.pprint :as pp])
+  (:import [java.io StringReader])
   (:gen-class))
 
-(defonce target-url "https://www.mind-war.com/p/testing-testing-los-angeles-under")
+(defonce test-html-file "test/page-1.html")
+
+(defn extract-metadata
+  "Extracts structured article metadata from a parsed Enlive resource."
+  [html-resource]
+  (let [json-ld-selector [[:script (html/attr= :type "application/ld+json")]]
+        json-str (-> (html/select html-resource json-ld-selector)
+                     first
+                     html/text)
+        parsed-json (json/parse-string json-str true)
+        published-date-raw (:datePublished parsed-json)]
+    {:title (:headline parsed-json)
+     :author (get-in parsed-json [:author 0 :name])
+     :publication_date (when published-date-raw
+                         (subs published-date-raw 0 10))
+     :source_url (:url parsed-json)}))
 
 (defn -main
-  "Fetches the HTML source of a target URL and prints it to stdout."
+  "Reads a local HTML file, extracts article metadata, and prints it."
   [& args]
-  (println "-> Initializing headless browser and fetching page source for:" target-url)
+  (println "-> Reading and parsing local file:" test-html-file)
+  (try
+    (let [html-string (slurp test-html-file)
+          ;; Use a StringReader for Enlive to parse from the string
+          html-resource (html/html-resource (StringReader. html-string))
+          metadata (extract-metadata html-resource)]
 
-  (let [temp-dir (str (Files/createTempDirectory "etaoin-user-data-" (into-array FileAttribute [])))
-        ;; Options for the Chrome driver process.
-        ;; :headless true is the key for running without a GUI.
-        driver-opts {:headless true
-                     :args [(str "--user-data-dir=" temp-dir)
-                            "--disable-gpu"
-                            "--no-sandbox"]}]
-
-    ;; The e/chrome function with options returns a driver object (a map).
-    ;; We must manually manage its lifecycle with a try...finally block.
-    (let [driver (e/chrome driver-opts)]
-      (try
-        (e/go driver target-url)
-        (let [html-source (e/get-source driver)]
-          (println "\n--- BEGIN HTML SOURCE ---")
-          (println html-source)
-          (println "--- END HTML SOURCE ---"))
-        (finally
-          ;; The finally block ensures that e/quit is always called,
-          ;; even if an error occurs in the try block. This is crucial
-          ;; for preventing orphaned browser processes.
-          (e/quit driver)
-          (println "-> Driver process terminated. Process complete."))))
-  (shutdown-agents)))
+      (println "\n--- EXTRACTED METADATA ---")
+      (pp/pprint metadata)
+      (println "--------------------------"))
+    (catch java.io.FileNotFoundException e
+      (println "\nERROR: File not found ->" (.getMessage e))
+      (println "Please ensure 'test/page-1.html' exists."))))
