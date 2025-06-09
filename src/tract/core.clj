@@ -9,16 +9,26 @@
 (defonce test-html-file "test/page-1.html")
 
 ;; --- FORWARD DECLARATION ---
-;; We need to declare html-to-markdown because it's called recursively by process-node.
 (declare html-to-markdown)
 
 ;; --- NODE PROCESSING LOGIC ---
 
+(defn process-image-node [node]
+  "Processes an image container (figure) and extracts image and caption info."
+  (let [img-node (-> (html/select node [:img]) first)
+        caption-node (-> (html/select node [:figcaption]) first)
+        img-src (get-in img-node [:attrs :src])
+        alt-text (get-in img-node [:attrs :alt] "")
+        caption (if caption-node (html/text caption-node) "")]
+    (str "\n" (format "![%s](%s)" (or (not-empty alt-text) caption) img-src) "\n"
+         (when (not-empty caption) (str "*" caption "*\n")))))
+
 (defn process-node [node]
   "Recursively processes a single Enlive node and its children."
   (if (string? node)
-    node
+    (str/trim node) ; Trim whitespace from raw text nodes
     (let [tag (:tag node)
+          attrs (:attrs node)
           content (html-to-markdown (:content node))]
       (case tag
         :p (str "\n" content "\n")
@@ -29,21 +39,24 @@
         :em (str "*" content "*")
         :i (str "*" content "*")
         :b (str "**" content "**")
-        :a (format "[%s](%s)" content (get-in node [:attrs :href]))
+        :a (format "[%s](%s)" content (:href attrs))
         :li (str "* " content "\n")
         :ul (str "\n" content)
         :ol (str "\n" content)
         :hr "\n---\n"
-        :blockquote (str "> " (str/replace content #"\n" "\n> ") "\n")
-        ;; Default case: just process the content, ignore the tag
-        content))))
+        :blockquote (str "\n> " (str/replace content #"\n" "\n> ") "\n")
+        :figure (process-image-node node)
+        (str content " ")))))
 
 (defn html-to-markdown
   "Converts a sequence of Enlive nodes to a Markdown string."
   [nodes]
-  (->> nodes
-       (map process-node)
-       (apply str)))
+  (-> (->> nodes               ; Use ->> for map and apply
+           (map process-node)
+           (apply str))
+      ;; **FIXED HERE**: Use -> for string functions
+      (str/replace #"(?m)^(\s*\n){2,}" "\n") ; Collapse multiple blank lines
+      (str/trim)))
 
 ;; --- EXTRACTION LOGIC ---
 
@@ -66,8 +79,9 @@
   "Selects the main article body and converts it to Markdown."
   [html-resource]
   (let [body-selector [:div.body.markup]
-        ;; Also remove any subscribe widgets that might be inside the body
-        nodes-to-remove [[:div.subscribe-widget]]
+        nodes-to-remove [[:div.subscribe-widget]
+                         [:div.digestPostEmbed-flwiST]
+                         [:p (html/attr? :data-component-name)]]
 
         body-nodes (-> (html/select html-resource body-selector)
                        first
@@ -85,7 +99,6 @@
 (defn -main
   "Reads a local HTML file, extracts content, and prints it as Markdown."
   [& args]
-  (println "-> Reading and parsing local file:" test-html-file)
   (try
     (let [html-string (slurp test-html-file)
           html-resource (html/html-resource (StringReader. html-string))
