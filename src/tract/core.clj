@@ -6,7 +6,7 @@
             [clojure.java.io :as io]
             [clj-http.lite.client :as client])
   (:import [java.io StringReader File]
-           [java.net URL]))
+           [java.net URL URLDecoder]))
 
 (defonce test-html-file "test/page-1.html")
 
@@ -16,29 +16,30 @@
 ;; --- URL & PATH HELPERS ---
 
 (defn- url->local-path [image-url-str]
-  "Converts a clean image URL into a local file path."
-  (let [url (new URL image-url-str)
+  "Converts a potentially complex image URL into a clean local file path."
+  (let [cdn-prefix "/https%3A"
+        ;; Check if the URL string contains an embedded original URL
+        clean-url-str (if (str/includes? image-url-str cdn-prefix)
+                        (let [start-index (str/last-index-of image-url-str cdn-prefix)]
+                          ;; **FIXED**: Start substring *after* the slash.
+                          (URLDecoder/decode (subs image-url-str (inc start-index)) "UTF-8"))
+                        image-url-str)
+        url (new URL clean-url-str)
         host (.getHost url)
-        ;; Remove the leading '/' from the path to make it relative
         path (subs (.getPath url) 1)]
     (io/file host path)))
 
 ;; --- NODE PROCESSING LOGIC ---
 
 (defn process-image-node [node image-jobs-atom article-key]
-  "Processes an image, adds its metadata to the jobs atom, and returns markdown."
   (let [img-node (-> (html/select node [:img]) first)
         caption-node (-> (html/select node [:figcaption]) first)
-        ;; **FIXED**: Prioritize the real src from data-attrs
-        data-attrs-json (get-in img-node [:attrs :data-attrs])
-        img-src (if data-attrs-json
-                  (:src (json/parse-string data-attrs-json true))
-                  (get-in img-node [:attrs :src])) ; Fallback
+        img-src (get-in img-node [:attrs :src])
         alt-text (get-in img-node [:attrs :alt] "")
         title-text (get-in img-node [:attrs :title] "")
         caption (if caption-node (html/text caption-node) "")]
     (if-not img-src
-      "" ; Don't process nodes without an image source
+      ""
       (let [local-path (url->local-path img-src)
             image-job {:article_key article-key
                        :image_source_url img-src
@@ -128,9 +129,7 @@
         (io/copy (:body response) out-stream)))
     (let [json-filename (str (:article_key job) "_" (hash job) ".json")
           json-file (io/file img-dir json-filename)
-          json-data (-> job
-                        (dissoc :metadata) ; Clean up the job map before writing
-                        (json/generate-string {:pretty true}))]
+          json-data (json/generate-string job {:pretty true}) ]
       (println (str "\t-> Writing metadata to " json-file))
       (spit json-file json-data))))
 
@@ -149,7 +148,7 @@
       (spit output-filename final-content)
       (println "-> Processing" (count images) "images...")
       (doseq [job images]
-        (process-image-job job)) ; Pass the simpler job map
+        (process-image-job job))
       (println "-> Done."))
     (catch Exception e
       (println "\nAn error occurred:")
