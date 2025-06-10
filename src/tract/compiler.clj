@@ -27,18 +27,15 @@
 
 (defn- process-node [node article-key]
   (if (string? node)
-    ;; **FIXED**: Do not trim individual text nodes, to preserve spacing.
     {:markdown node, :images []}
     (let [child-results (map #(process-node % article-key) (:content node))
           content-md (->> child-results (map :markdown) (str/join))
           child-images (->> child-results (map :images) (apply concat))
           tag (:tag node)
           attrs (:attrs node)]
-
       (case tag
         :figure (let [figure-result (process-image-node node article-key)]
                   (update figure-result :images #(doall (concat % child-images))))
-
         :p {:markdown (str "\n" content-md "\n"), :images child-images}
         :h1 {:markdown (str "\n# " content-md "\n"), :images child-images}
         :h2 {:markdown (str "\n## " content-md "\n"), :images child-images}
@@ -53,8 +50,6 @@
         :ol {:markdown (str "\n" content-md), :images child-images}
         :hr {:markdown "\n---\n", :images child-images}
         :blockquote {:markdown (str "\n> " (str/replace content-md #"\n" "\n> ") "\n"), :images child-images}
-
-        ;; **FIXED**: Default case just passes content through without adding a space.
         {:markdown content-md, :images child-images}))))
 
 (defn- format-toml-front-matter [metadata]
@@ -62,14 +57,19 @@
        (format "title = \"%s\"\n" (:title metadata))
        (format "author = \"%s\"\n" (:author metadata))
        (format "article_key = \"%s\"\n" (:article_key metadata))
-       (format "publication_date = \"%s\"\n" (:publication_date metadata))
+       (format "publication_date = \"%s\"\n" (or (:publication_date metadata) "unknown"))
        (format "source_url = \"%s\"\n" (:source_url metadata))
        "---\n\n"))
 
 (defn compile-to-article
   "Takes parsed data and returns a map of final article data and image jobs."
   [{:keys [metadata body-nodes]}]
-  (let [article-key (util/generate-article-key metadata)
+  (let [;; **FIXED**: The fallback logic is now handled here, at the correct level.
+        article-key (if (str/blank? (:title metadata))
+                      (-> (:source_url metadata)
+                          util/url->filename
+                          (str/replace #"\.html$" ""))
+                      (util/generate-article-key metadata))
         full-metadata (assoc metadata :article_key article-key)
         {:keys [markdown images]} (process-node {:tag :div :content body-nodes} article-key)
         final-markdown (-> markdown

@@ -3,7 +3,8 @@
             [tract.parser :as parser-logic]
             [tract.compiler :as compiler]
             [tract.io :as io]
-            [clojure.java.io :as jio]))
+            [clojure.java.io :as jio])
+  (:gen-class)) ; <-- Add :gen-class to make it an AOT-compilable main namespace
 
 (def ^:private stage-name :parser)
 (def ^:private output-dir "work/3-processed")
@@ -14,13 +15,9 @@
   (println (str "-> Processing HTML file: " (.getName html-file)))
   (try
     (let [html-string (slurp html-file)
-          ;; 1. Parse
           parsed-data (parser-logic/parse-html html-string)
-          ;; 2. Compile
           {:keys [article images]} (compiler/compile-to-article parsed-data)
-          ;; 3. Write outputs
           output-path (jio/file output-dir)]
-
       (.mkdirs output-path)
       (let [md-file (jio/file output-path (str (:article_key (:metadata article)) ".md"))]
         (io/write-article! (assoc article :output-file md-file)))
@@ -30,7 +27,6 @@
         (let [job-with-output-dir (update job :image_path #(jio/file output-path %))]
           (io/download-image! job-with-output-dir))))
 
-    ;; If all processing succeeded, move the input file to done
     (pipeline/move-to-done! html-file stage-name)
     (catch Exception e
       (pipeline/move-to-error! html-file stage-name e))))
@@ -47,3 +43,8 @@
         (doseq [file pending-files]
           (process-html-file! file)))))
   (println "--- Parser Stage Complete ---"))
+
+;; **FIXED**: Add a -main function to make this namespace directly runnable.
+(defn -main [& args]
+  (run-stage!)
+  (shutdown-agents))

@@ -6,11 +6,13 @@
 (defn generate-article-key
   "Generates a unique file-safe key from article metadata."
   [{:keys [publication_date title]}]
-  (let [full-slug (-> (str/lower-case title)
+  ;; **REVERTED**: This function is now pure again. It only knows about metadata.
+  (let [date-part (or publication_date (.toString (java.time.LocalDate/now)))
+        full-slug (-> (str/lower-case (or title "untitled"))
                       (str/replace #"[^a-z0-9\s-]" "")
                       (str/replace #"\s+" "-"))
         slug (subs full-slug 0 (min (count full-slug) 50))]
-    (str publication_date "_" slug)))
+    (str date-part "_" slug)))
 
 (defn url->local-path
   "Converts a potentially complex image URL into a clean local file path string."
@@ -30,6 +32,6 @@
   [url-str]
   (let [path (-> (new URL url-str) (.getPath))]
     (-> path
-        (str/replace #"^/p/" "") ; Remove substack's /p/ prefix
-        (str/replace #"[^a-zA-Z0-9-]" "_") ; Sanitize unsafe chars to underscores
+        (str/replace #"^/p/" "")
+        (str/replace #"[^a-zA-Z0-9-]" "_")
         (str ".html"))))
