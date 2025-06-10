@@ -1,0 +1,82 @@
+* Workflow coordinated by placing files in directories
+
+Recall that the workflow coordination is done by files placed in directories.
+Each stage has a pair of input directories, pending and done.
+When the stage is activated, it looks for files in the pending directory and
+acts on them.  It will write its output into a file in the pending directory of the next stage,
+and only then will it move its input file from its own pending directory to its done directory.
+
+If an error occurs when processing a file, that file will be moved to the stage's error directory,
+along with a file that describes the error and how to correct it.
+
+The intent is that the operation could be retried by moving the file from the error directory
+back to the pending directory and activating the stage again.
+
+The code should handle this stage mechanism in centralized way, by abstracting
+the transition actions into functions.  We will call these the "common transition functions".
+
+** Job stage
+  The first stage of the workflow is the job stage. It translates a jobspec
+  file into a list of URLs in a file, one URL per line.
+  The name of the jobspec file doesn't matter, but may hint at its type of contents (see below).
+
+  The job stage reads a jobspec file from its pending directory, and writes a list of URLs to the
+  pending directory of the fetch stage. Then it moves the jobspec file to its done directory.
+
+  The jobspec file is YAML format.  Its contents can be one of
+    * a literal list of URLs
+      * The list is copied into URL-per-line format in the fetch stage's pending directory.
+      * Example:
+        #+begin_src yaml
+          urls:
+            - "https://example.com"
+            - "https://another-site.org"
+            - "https://yetanother.net"
+        #+end_src
+    * the name of a Substack author and an optional date range
+        * The URL of the author's Atom feed is derived from these
+        * if substack supports the date range as URL parameters, the date range is encoded there
+        * That Atom URL is placed in the job stage's own pending directory (same directory author/date file was in)
+        * then the original author/date file is placed in the job stage's done directory
+        * the job stage then activates itself so it will process the Atom URL file.
+        * Example
+          #+begin_src yaml
+            author: Jane Doe
+            date:
+              start: 2019-01-01
+              end: 2021-12-31
+          #+end_src
+    * the URL of an Atom feed
+        * The Atom document is fetched, URLs extracted into one-per-line format,
+          and copied into the fetch stage's pending directory.
+        * Example
+          #+begin_src yaml
+            atom: https://example.com/atom
+          #+end_src
+    * the URL of an RSS feed
+        * The RSS document is fetched, URLs extracted into one-per-line format,
+          and copied into the fetch stage's pending directory.
+        * Example
+          #+begin_src yaml
+            rss: https://example.com/rss
+          #+end_src
+
+
+** Fetch stage
+
+  The fetch stage reads the URLs and writes HTML into the pending directory of the parser stage.
+  Most of this stage is already implemented, though it needs to be modified to read
+  the list of URLs from files in the fetch stage's pending directory and move them to the done directory
+  after fetching them, using the common transition functions.
+
+  The fetch stage's input file is a text file that contains URLs, one per line.
+  The file may have one URL in it.
+  The last URL in the file need not have a newline after it.
+  If the file is empty, no action is taken on it.
+
+
+** Parser stage
+
+  The parser stage reads HTML and writes markdown and images into the output directory.
+  This stage is already implemented, though it needs to be tweaked to use the common
+  transition functions.

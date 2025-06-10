@@ -1,15 +1,24 @@
 {:paths ["src" "test"]
- :deps {etaoin/etaoin {:mvn/version "1.0.39"}
+
+ ;; Add this section to specify where to find dependencies.
+ :mvn/repos {"clojars" {:url "https://repo.clojars.org/"}}
+
+ :deps {;; Existing Dependencies
+        etaoin/etaoin {:mvn/version "1.0.39"}
         enlive/enlive {:mvn/version "1.1.6"}
         cheshire/cheshire {:mvn/version "5.11.0"}
         clj-http-lite/clj-http-lite {:mvn/version "0.3.0"}
         javax.xml.bind/jaxb-api {:mvn/version "2.3.1"}
-        org.glassfish.jaxb/jaxb-runtime {:mvn/version "2.3.1"}}
+        org.glassfish.jaxb/jaxb-runtime {:mvn/version "2.3.1"}
+
+        ;; Dependencies for the Job Stage
+        org.clojure/data.xml {:mvn/version "0.2.0-alpha9"}
+        clj-commons/clj-yaml {:mvn/version "1.0.29"} 
+        }
+
  :aliases
  {:run {:main-opts ["-m" "tract.core"]}
-
-  ;; Alias for the new fetcher step
-  :fetch {:main-opts ["-m" "tract.fetcher"]}
+  :fetch {:main-opts ["-m" "tract.stages.fetch"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner
