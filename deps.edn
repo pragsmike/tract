@@ -3,8 +3,11 @@
         enlive/enlive {:mvn/version "1.1.6"}
         cheshire/cheshire {:mvn/version "5.11.0"}
         clj-http-lite/clj-http-lite {:mvn/version "0.3.0"}
-        ;; ADD THESE TWO LIBRARIES TO FIX THE CLASSNOTFOUNDEXCEPTION
         javax.xml.bind/jaxb-api {:mvn/version "2.3.1"}
         org.glassfish.jaxb/jaxb-runtime {:mvn/version "2.3.1"}}
  :aliases
- {:run {:main-opts ["-m" "tract.core"]}}}
+ {:run {:main-opts ["-m" "tract.core"]}
+  :test {:extra-paths ["test"]
+         :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         ;;:main-opts ["-m" "cognitect.test-runner"]
+         :exec-fn cognitect.test-runner.api/test}}}

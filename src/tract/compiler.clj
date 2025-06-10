@@ -27,18 +27,16 @@
 
 (defn- process-node [node article-key]
   (if (string? node)
-    {:markdown (str/trim node), :images []}
-    (let [;; **FIXED**: The recursive call is now the first step.
-          child-results (map #(process-node % article-key) (:content node))
+    ;; **FIXED**: Do not trim individual text nodes, to preserve spacing.
+    {:markdown node, :images []}
+    (let [child-results (map #(process-node % article-key) (:content node))
           content-md (->> child-results (map :markdown) (str/join))
           child-images (->> child-results (map :images) (apply concat))
           tag (:tag node)
           attrs (:attrs node)]
 
-      ;; **FIXED**: Each case now returns the complete map.
       (case tag
         :figure (let [figure-result (process-image-node node article-key)]
-                  ;; Combine images from this node with any found in its children
                   (update figure-result :images #(doall (concat % child-images))))
 
         :p {:markdown (str "\n" content-md "\n"), :images child-images}
@@ -56,8 +54,8 @@
         :hr {:markdown "\n---\n", :images child-images}
         :blockquote {:markdown (str "\n> " (str/replace content-md #"\n" "\n> ") "\n"), :images child-images}
 
-        ;; Default case passes child images up
-        {:markdown (str content-md " "), :images child-images}))))
+        ;; **FIXED**: Default case just passes content through without adding a space.
+        {:markdown content-md, :images child-images}))))
 
 (defn- format-toml-front-matter [metadata]
   (str "---\n"
