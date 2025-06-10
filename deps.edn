@@ -7,7 +7,11 @@
         org.glassfish.jaxb/jaxb-runtime {:mvn/version "2.3.1"}}
  :aliases
  {:run {:main-opts ["-m" "tract.core"]}
-  :test {:extra-paths ["test"]
-         :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-         ;;:main-opts ["-m" "cognitect.test-runner"]
+
+  ;; Alias for the new fetcher step
+  :fetch {:main-opts ["-m" "tract.fetcher"]}
+
+  :test {:extra-paths ["src" "test"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
          :exec-fn cognitect.test-runner.api/test}}}

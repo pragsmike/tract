@@ -1,6 +1,5 @@
 (ns tract.util
   (:require [clojure.string :as str])
-  ;; **FIXED**: Added the import for the File class.
   (:import [java.net URL URLDecoder]
            [java.io File]))
 
@@ -25,3 +24,12 @@
         host (.getHost url)
         path (subs (.getPath url) 1)]
     (str host File/separator path)))
+
+(defn url->filename
+  "Creates a safe filename from a URL's path, suitable for fetched HTML."
+  [url-str]
+  (let [path (-> (new URL url-str) (.getPath))]
+    (-> path
+        (str/replace #"^/p/" "") ; Remove substack's /p/ prefix
+        (str/replace #"[^a-zA-Z0-9-]" "_") ; Sanitize unsafe chars to underscores
+        (str ".html"))))
