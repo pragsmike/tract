@@ -1,0 +1,12 @@
+I'd like to structure the final workflow as a sequence of steps,
+where the steps communicate via files in directories. Each step would have a
+pair of input directories: pending and done. For example, the first step would
+read a job file in its pending directory to find out what URLs are to be
+fetched, fetch them, and put the HTML in the next step's pending directory where
+the next step will find it, and then move the job file into its "done"
+directory. This way, the existing code that reads from a file can still do that.
+This makes it easy to test. In the future, we'll add the step that produces that
+file by fetching from a URL, independently of the existing code. We'll work out
+the details of the file-coordinated workflow later, including error handling.
+For now, I just want to make sure our refactoring we're about to do remains
+based on reading from files.
