@@ -3,6 +3,19 @@
             [clojure.java.io :as io]
             [cheshire.core :as json]))
 
+(def ^:private base-throttle-ms 2000)
+(def ^:private random-throttle-ms 1500)
+
+(defn throttled-fetch!
+  "Fetches the body of a URL after a polite, randomized delay.
+  Returns the response body as a string. Throws on error."
+  [url]
+  (let [sleep-duration (+ base-throttle-ms (rand-int random-throttle-ms))]
+    (println (str "\t-> Waiting for " sleep-duration "ms..."))
+    (Thread/sleep sleep-duration)
+    (println (str "\t-> Fetching feed/data from " url))
+    (:body (client/get url))))
+
 (defn write-article!
   "Writes the complete article markdown file."
   [{:keys [markdown output-file]}]
@@ -12,11 +25,12 @@
 (defn download-image!
   "Downloads an image and writes its metadata JSON file."
   [image-job]
-  (let [;; The image_path is now a File object, which is correct for I/O
-        local-img-file (:image_path image-job)
+  (let [local-img-file (:image_path image-job)
         img-dir (.getParentFile local-img-file)]
     (try
-      ;; Note: We now get the source URL from the job itself, not the complex path
+      ;; This function fetches many small files, so we use a shorter throttle.
+      ;; The main article fetch has its own, longer throttle.
+      (Thread/sleep 50)
       (println (str "\t-> Downloading " (:image_source_url image-job)))
       (.mkdirs img-dir)
       (with-open [out-stream (io/output-stream local-img-file)]
@@ -25,7 +39,6 @@
 
       (let [json-filename (str (:article_key image-job) "_" (hash image-job) ".json")
             json-file (io/file img-dir json-filename)
-            ;; **FIXED**: Convert the File object back to a string before JSON encoding.
             serializable-job (update image-job :image_path str)
             json-data (json/generate-string serializable-job {:pretty true})]
         (println (str "\t-> Writing metadata to " json-file))

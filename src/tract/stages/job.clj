@@ -1,24 +1,87 @@
 (ns tract.stages.job
   (:require [tract.pipeline :as pipeline]
+            [tract.io :as io]
             [clj-yaml.core :as yaml]
             [clojure.string :as str]
-            [clojure.java.io :as io]))
+            [clojure.data.xml :as xml])
+  (:import [java.time LocalDate]
+           [java.time.format DateTimeFormatter]
+           [java.time.temporal TemporalAccessor]))
 
 (def ^:private stage-name :job)
 (def ^:private next-stage-name :fetch)
 
+;; A map of XML tag paths to find the date for different feed types.
+(def ^:private date-parsers
+  {:atom-date-parser (fn [entry]
+                       (->> entry :content (filter #(#{:updated :published} (:tag %))) first :content first))
+   :rss-date-parser  (fn [item]
+                       (let [date-str (->> item :content (filter #(= :pubDate (:tag %))) first :content first)
+                             formatter DateTimeFormatter/RFC_1123_DATE_TIME
+                             temporal-accessor (.parse formatter date-str)]
+                         (.format (LocalDate/from temporal-accessor) DateTimeFormatter/ISO_LOCAL_DATE)))})
+
+(defn- is-in-date-range? [date-str {:keys [start end]}]
+  (and (or (not start) (>= 0 (compare date-str start)))
+       (or (not end)   (<= 0 (compare date-str end)))))
+
+(defn- process-feed-url!
+  "Fetches and parses a feed URL, returning a list of article links."
+  [feed-url date-range]
+  (let [xml-string (io/throttled-fetch! feed-url)
+        parsed-xml (xml/parse-str xml-string)
+        root-tag (:tag parsed-xml)
+        tag-link? #(= :link (:tag %))]
+    (cond
+      (= :feed root-tag) ; Atom Feed
+      (->> (xml-seq parsed-xml)
+           (filter #(= :entry (:tag %)))
+           (map #(let [date ((:atom-date-parser date-parsers) %)]
+                   {:link (->> % :content (filter tag-link?) first :attrs :href)
+                    :published-date (subs date 0 10)}))
+           (filter #(is-in-date-range? (:published-date %) date-range))
+           (map :link))
+
+      (= :rss root-tag) ; RSS Feed
+      (->> (xml-seq parsed-xml)
+           (filter #(= :item (:tag %)))
+           (map #(let [date ((:rss-date-parser date-parsers) %)]
+                   {:link (->> % :content (filter tag-link?) first :content first)
+                    :published-date date}))
+           (filter #(is-in-date-range? (:published-date %) date-range))
+           (map :link))
+
+      :else (throw (ex-info (str "Unknown feed type for root tag: " root-tag) {:url feed-url})))))
+
 (defn- process-job-spec!
   "Processes a parsed YAML job-spec map and returns a list of URLs."
   [job-spec]
-  ;; We will add other job types (atom, author, etc.) to this cond.
   (cond
     (:urls job-spec)
-    (do
-      (println "\t-> Found 'urls' job type.")
-      (:urls job-spec))
+    (do (println "\t-> Found 'urls' job type.")
+        (:urls job-spec))
 
-    :else
-    (throw (ex-info "Unknown job type in job-spec" {:job-spec job-spec}))))
+    (:author job-spec)
+    (let [author (:author job-spec)
+          domain (if (str/includes? author ".") author (str author ".substack.com"))
+          feed-url (str "https://" domain "/feed")
+          date-range (:date_range job-spec)]
+      (println (str "\t-> Found 'author' job type. Fetching feed for " author))
+      (process-feed-url! feed-url date-range))
+
+    (:atom job-spec)
+    (let [feed-url (:atom job-spec)
+          date-range (:date_range job-spec)]
+      (println (str "\t-> Found 'atom' job type. Fetching feed from " feed-url))
+      (process-feed-url! feed-url date-range))
+
+    (:rss job-spec)
+    (let [feed-url (:rss job-spec)
+          date-range (:date_range job-spec)]
+      (println (str "\t-> Found 'rss' job type. Fetching feed from " feed-url))
+      (process-feed-url! feed-url date-range))
+
+    :else (throw (ex-info "Unknown job type in job-spec" {:job-spec job-spec}))))
 
 (defn- process-job-file!
   "Processes a single .yaml job file."
@@ -28,11 +91,11 @@
     (let [job-spec (yaml/parse-string (slurp job-file))
           urls (process-job-spec! job-spec)
           url-list-string (str/join "\n" urls)
-          ;; Create an output filename based on the input filename
           output-filename (-> (.getName job-file)
-                              (str/replace #"\.yaml$" ".txt")
-                              (str/replace #"\.yml$" ".txt"))]
-      (pipeline/write-to-next-stage! url-list-string next-stage-name output-filename)
+                              (str/replace #"\.ya?ml$" ".txt"))]
+      (if (empty? urls)
+        (println "\t-> No URLs found for this job. Nothing to write.")
+        (pipeline/write-to-next-stage! url-list-string next-stage-name output-filename))
       (pipeline/move-to-done! job-file stage-name))
     (catch Exception e
       (pipeline/move-to-error! job-file stage-name e))))
