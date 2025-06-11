@@ -1,0 +1,5 @@
+When we fetch the article, will the headless browser be fetching the images,
+javascript, and other resources referenced by the HTML? I think it will. Then
+when we fetch the images in the parsing stage, those will be duplicate requests,
+as far as Substack is concerned. I wonder if a caching proxy like Squid could
+help us here. Or do you think differently?

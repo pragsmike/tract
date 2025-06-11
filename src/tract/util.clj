@@ -6,7 +6,6 @@
 (defn generate-article-key
   "Generates a unique file-safe key from article metadata."
   [{:keys [publication_date title]}]
-  ;; **REVERTED**: This function is now pure again. It only knows about metadata.
   (let [date-part (or publication_date (.toString (java.time.LocalDate/now)))
         full-slug (-> (str/lower-case (or title "untitled"))
                       (str/replace #"[^a-z0-9\s-]" "")
@@ -17,6 +16,7 @@
 (defn url->local-path
   "Converts a potentially complex image URL into a clean local file path string."
   [image-url-str]
+  {:pre [(not (str/blank? image-url-str))]} ;; **FIXED**: Add pre-condition for safety
   (let [cdn-prefix "/https%3A"
         clean-url-str (if (str/includes? image-url-str cdn-prefix)
                         (let [start-index (str/last-index-of image-url-str cdn-prefix)]
@@ -30,6 +30,7 @@
 (defn url->filename
   "Creates a safe filename from a URL's path, suitable for fetched HTML."
   [url-str]
+  {:pre [(not (str/blank? url-str))]} ;; **FIXED**: Add pre-condition for safety
   (let [path (-> (new URL url-str) (.getPath))]
     (-> path
         (str/replace #"^/p/" "")

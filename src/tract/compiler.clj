@@ -3,7 +3,10 @@
             [clojure.string :as str]
             [net.cgrand.enlive-html :as html]))
 
+;; --- Forward Declaration for Mutual Recursion ---
 (declare process-node)
+
+;; --- Node Processing Logic ---
 
 (defn- process-image-node [node article-key]
   (let [img-node (-> (html/select node [:img]) first)
@@ -52,24 +55,30 @@
         :blockquote {:markdown (str "\n> " (str/replace content-md #"\n" "\n> ") "\n"), :images child-images}
         {:markdown content-md, :images child-images}))))
 
+;; --- Public API ---
+
 (defn- format-toml-front-matter [metadata]
   (str "---\n"
-       (format "title = \"%s\"\n" (:title metadata))
+       (format "title = \"%s\"\n" (or (:title metadata) "Untitled"))
        (format "author = \"%s\"\n" (:author metadata))
        (format "article_key = \"%s\"\n" (:article_key metadata))
        (format "publication_date = \"%s\"\n" (or (:publication_date metadata) "unknown"))
-       (format "source_url = \"%s\"\n" (:source_url metadata))
+       (format "source_url = \"%s\"\n" (or (:source_url metadata) "unknown"))
        "---\n\n"))
 
 (defn compile-to-article
   "Takes parsed data and returns a map of final article data and image jobs."
   [{:keys [metadata body-nodes]}]
-  (let [;; **FIXED**: The fallback logic is now handled here, at the correct level.
-        article-key (if (str/blank? (:title metadata))
-                      (-> (:source_url metadata)
-                          util/url->filename
-                          (str/replace #"\.html$" ""))
-                      (util/generate-article-key metadata))
+  (let [article-key (cond
+                      (not (str/blank? (:title metadata)))
+                      (util/generate-article-key metadata)
+
+                      (not (str/blank? (:source_url metadata)))
+                      (-> (:source_url metadata) util/url->filename (str/replace #"\.html$" ""))
+
+                      :else
+                      (str "unknown-article_" (System/currentTimeMillis)))
+
         full-metadata (assoc metadata :article_key article-key)
         {:keys [markdown images]} (process-node {:tag :div :content body-nodes} article-key)
         final-markdown (-> markdown
