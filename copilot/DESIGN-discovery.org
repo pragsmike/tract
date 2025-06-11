@@ -1,0 +1,78 @@
+#+TITLE: Expanding the set of stored articles
+
+Having now built a way to scrape certain web content, we turn now to ways to
+manage and expand that content.
+
+We have already implemented the mechanism for fetching a given set of
+articles as HTML, and extracting Markdown and image content from them.
+We'll call this the "scraping" part.
+
+Here we describe a mechanism for expanding the set of articles that we
+have downloaded and processed, by inspecting the existing set for references
+to articles that we don't already have.  We then create a job listing those
+URLs so that the existing scraping machinery will fetch and process them.
+We'll call this the "discovery" part.
+
+This new discovery mechanism will be largely separate from the existing scraping
+code, though its namespace files will reside in the same codebase and git repo.
+The two parts will operate on the same files in the existing "work" directory
+structure.
+
+The discovery may find URLs of articles that we have already downloaded and processed.
+We will not download those again.  Ways to handle that are discussed below.
+
+* Discovering URLs to Other Articles
+
+  We will build a utility that will scan the article HTML documents already downloaded,
+  or the Markdown derived from them, and extract the URLs from them.
+  We will derive a list of interesting URLs (defined below).
+
+  Substack article content, or the surrounding matter, usually contains links, some of which are of interest.
+  These URLs appear in the href attribute of A (anchor) tags, and less often in form and input elements.
+
+
+** Links to Substack
+
+    Sometimes an article's own content will contain links to other Substack articles.
+    Also, an article's content will typically be presented along with a section of links
+    to related articles by the same author, or articles by other Substack authors.
+    All these are the ones we are immediately interested in listing.
+
+** Links to external resources
+
+    An article's own content may have links to external resources, not on Substack,
+    such as wikipedia entries, youtube videos, or other web sites.
+    These links may be references to source materials to support the arguments
+    made in the article, relevant further reading, or that otherwise amplify the article's effect.
+
+    We are interested in cataloging these, but this is not an immediate goal.
+
+** Ad links
+
+    Ad links are to sponsored content.  Whenever we can recognize these, we will ignore them.
+
+** Navigation, display, and subscription controls
+
+    Anchor tags are also used for "Share", "Subscribe", and similar controls.
+    Whenever we can recognize these, we will ignore them.
+
+* Avoiding downloading articles more than once
+
+  Ideally, we want to avoid downloading articles more than once.
+
+  However, we realize that we might inadvertantly do so, for instance, if the
+  same article is reachable by a different URL, or for some other reason we
+  don't recognize it as being one that we already have, before downloading it.
+
+  In any case, we especially want to avoid processing the article more than
+  once, in case it does get downloaded again.
+
+  One way to handle this is to keep a database of URLs that have alraedy been
+  downloaded.  This database could be built by scanning the metadata
+  of the articles we have stored.
+
+  The fetch mechanism would then refuse to fetch any URL that appears in
+  that "already-fetched" database.
+
+  For now it is acceptable to store these in a file.
+  Later, we might use a lightweight SQL database.

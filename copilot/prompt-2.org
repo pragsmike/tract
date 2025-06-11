@@ -1,0 +1,7 @@
+Read the given design doc for a new part of the system, the "discovery" part.
+
+Don't generate code, or any other artifacts just yet.
+Analyze the design doc to find inconsistencies in what it specifies.
+I will update the document to correct whatever flaws we find.
+Then we will converse about how to proceed.
+
