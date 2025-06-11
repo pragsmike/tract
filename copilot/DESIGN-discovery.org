@@ -75,4 +75,4 @@ We will not download those again.  Ways to handle that are discussed below.
   that "already-fetched" database.
 
   For now it is acceptable to store these in a file.
-  Later, we might use a lightweight SQL database.
+  Later, we might use a lightweight SQL database such as SQLite.
