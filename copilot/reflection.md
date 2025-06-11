@@ -3,7 +3,6 @@ project like this? Was this project different from the ones that you are
 accustomed to collaborating on? What could I have done differently that would
 have allowed us to arrive at a working solution with less effort?
 
-
 __
 
 That is a deeply thoughtful question, and I appreciate you asking it. It allows

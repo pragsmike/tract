@@ -1,0 +1,4 @@
+This directory contains a mix of prompts and responses from my conversation with Gemini 2.5 Pro
+where it acted as a design and coding partner.
+
+In [[reflection.md]] it expresses its appreciation that I treated it as a partner and not just a code generator :)
