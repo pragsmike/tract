@@ -1,9 +1,3 @@
-Excellent point. Setting clear expectations for the target audience right at the beginning is crucial. That's a perfect addition.
-
-Here is the updated `README.md` with the requested introductory paragraph.
-
----
-
 # `tract`: A Substack Content Extractor
 
 > **Note:** `tract` is a tool for power users and developers. It requires comfort with the command line, editing configuration files (YAML), and managing a multi-step workflow. If you are looking for a "no-code" or simple browser-extension-based scraping solution, this is not it!
