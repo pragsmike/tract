@@ -125,4 +125,4 @@ The HTML parser is heavily optimized for the structure of Substack pages. While 
 -   **[SingleFile](https://github.com/gildas-lormeau/SingleFile):** A browser extension that saves a complete webpage into a single, self-contained HTML file. Excellent for archiving individual pages with perfect fidelity.
 -   **[Scrapy](https://scrapy.org/):** A powerful, full-featured Python framework for large-scale web scraping. It's a much more complex tool but offers immense power and flexibility.
 -   **[Reading about Web Scraping Etiquette](https://www.zenrows.com/blog/web-scraping-etiquette):** It is important to understand the best practices for scraping websites politely and ethically.
--   **[The Web Scraping Club](https://substack.thewebscraping.club/):** A Substack publication about techniques and tools for extracting content from web sites.
+-   **[The Web Scraping Club](https://substack.thewebscraping.club/):** A publication about techniques and tools for extracting content from web sites.
