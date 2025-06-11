@@ -13,7 +13,9 @@ to articles that we don't already have.  We then create a job listing those
 URLs so that the existing scraping machinery will fetch and process them.
 We'll call this the "discovery" part.
 
-This new discovery mechanism will be largely separate from the existing scraping
+This new discovery mechanism will be a standalone tool, rather than
+being a stage in the existing pipeline.
+Its code will be largely separate from the existing scraping
 code, though its namespace files will reside in the same codebase and git repo.
 The two parts will operate on the same files in the existing "work" directory
 structure.
@@ -23,9 +25,9 @@ We will not download those again.  Ways to handle that are discussed below.
 
 * Discovering URLs to Other Articles
 
-  We will build a utility that will scan the article HTML documents already downloaded,
-  or the Markdown derived from them, and extract the URLs from them.
-  We will derive a list of interesting URLs (defined below).
+  We will build a utility that will scan the article HTML documents already
+  downloaded, and extract the URLs from them. We will derive a list of
+  interesting URLs (defined below).
 
   Substack article content, or the surrounding matter, usually contains links, some of which are of interest.
   These URLs appear in the href attribute of A (anchor) tags, and less often in form and input elements.
@@ -45,7 +47,13 @@ We will not download those again.  Ways to handle that are discussed below.
     These links may be references to source materials to support the arguments
     made in the article, relevant further reading, or that otherwise amplify the article's effect.
 
-    We are interested in cataloging these, but this is not an immediate goal.
+    We are interested in cataloging these, but we won't download them.
+
+    A simple and effective solution would be to have the discovery tool produce
+    a second database, with columns like source_article_key, external_url, link_text.
+
+    For now it is acceptable to store these in a file.
+    Later, we might use a lightweight SQL database such as SQLite.
 
 ** Ad links
 
@@ -69,10 +77,61 @@ We will not download those again.  Ways to handle that are discussed below.
 
   One way to handle this is to keep a database of URLs that have alraedy been
   downloaded.  This database could be built by scanning the metadata
-  of the articles we have stored.
+  of the articles we have stored as markdown, as well as the work directories
+  to catch any that have been fetched but not yet processed.
 
-  The fetch mechanism would then refuse to fetch any URL that appears in
-  that "already-fetched" database.
+  A URL should be considered "known" if it exists as a file in any of the
+  pipeline's pending or done directories. The "already-fetched" database should
+  be built by scanning the filenames in work/fetch/done, work/parser/pending,
+  and work/parser/done. The discovery mechanism would then not submit for fetch
+  any URL that appears in that "already-fetched" database.
 
   For now it is acceptable to store these in a file.
   Later, we might use a lightweight SQL database such as SQLite.
+
+* Expected execution sequence
+
+   The scraping pipeline runs with a job supplied by the user.
+   This collects an initial set of articles and other files under the work directory.
+
+   After the scraping pipeline has finished, the discovery tool runs. It does the following:
+     * creates or updates the database of already-fetched URLs
+     * creates or updates the database of referenced URLs
+     * creates the fetch job for the next run of the scraping pipeline
+
+   The user runs the scraping pipeline, which processes the new fetch job.
+
+   In case the user starts the discovery tool while the scraping pipeline is active,
+   it shouldn't cause any trouble.  Discovery will take note of any URLs that
+   are in process, and won't include them in its fetch job.
+   The worst outcome is that the scraping pipeline will not have fetched
+   one or more of the HTML documents, so whatever URLs they may have referenced
+   won't be included in the fetch job.  The next run of the discovery tool
+   after the scraping pipeline has finished, will include them.
+
+* Assumptions
+
+   The discovery tool will not start the scraping pipeline, and viceversa.
+   They are started manually by the user.
+
+   The discovery tool will usually not run while the scraping pipeline is
+   active, but it won't damage anything if it does. It might miss URLs
+   referenced by articles not yet fetched, though, so it should print a warning
+   if it notices that the scraping pipeline is running.
+
+* Plan
+
+  1) Scan HTML to produce two databases: referenced article URLs,
+     and referenced external URLs, excluding those for ads, controls, etc.
+     Initially, these databases will simply be stored in files.
+     A later step will keep them in SQLite.
+
+  2) Scan the files under the work directory to derive the list
+     of already-downloaded URLs, and place them in a database.
+     Again, this will initially be a file, but later will be SQLite.
+
+  3) Generate a fetch job that has URLs that are of referenced articles,
+     but which have not been downloaded already.
+     This will be a YAML file placed in work/fetch/pending, with the key
+     urls and a list of the URLs.
+     The next time the pipeline runs, it will process that job.
