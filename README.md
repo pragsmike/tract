@@ -114,7 +114,8 @@ The application will run through all the pipeline stages. Final output will appe
 This tool makes network requests to third-party websites. Although `tract` strives to be a good citizen by implementing polite throttling, **you are ultimately responsible for how you use this tool.** Abusing this tool to violate terms of service or overwhelm a website is strongly discouraged. Use it responsibly and ethically.
 
 ### Authentication
-The current authentication method relies on you maintaining a logged-in session in the persistent browser instance. The tool does not store your credentials directly. You must use a Substack account that is configured with a password.
+The current authentication method relies on you maintaining a logged-in session in the persistent browser instance. The tool does not store your credentials directly.  You must start the browser and log into the site.
+
 
 ### Parser Specificity
 The HTML parser is heavily optimized for the structure of Substack pages. While it has fallbacks and can often extract content from other sites, its performance on non-Substack pages may be degraded. The metadata or body content may not be as clean.
