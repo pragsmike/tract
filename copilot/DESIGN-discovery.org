@@ -75,19 +75,33 @@ We will not download those again.  Ways to handle that are discussed below.
   In any case, we especially want to avoid processing the article more than
   once, in case it does get downloaded again.
 
-  One way to handle this is to keep a database of URLs that have alraedy been
-  downloaded.  This database could be built by scanning the metadata
-  of the articles we have stored as markdown, as well as the work directories
-  to catch any that have been fetched but not yet processed.
+  One way to handle this is to keep a database of URLs that have already been
+  downloaded. This database could be built by scanning
+     * metadata of the articles we have stored as markdown
+     * files in work/fetch/done to catch any unprocessed URLs that have been fetched
+     * files in work/fetch/pending directories to catch URLs scheduled to be fetched
 
-  A URL should be considered "known" if it exists as a file in any of the
-  pipeline's pending or done directories. The "already-fetched" database should
-  be built by scanning the filenames in work/fetch/done, work/parser/pending,
-  and work/parser/done. The discovery mechanism would then not submit for fetch
+  We could also scan the HTML files that are pending parsing, but that adds
+  complication to handle an edge case that won't happen often and at worst would
+  cause an infrequent duplicate fetch.
+
+  The discovery mechanism would then not submit for fetch
   any URL that appears in that "already-fetched" database.
 
   For now it is acceptable to store these in a file.
   Later, we might use a lightweight SQL database such as SQLite.
+
+* Databases
+
+  The discovery tool produces the databases below.
+  Initially, these will be files, as we describe here.
+  A later step will use SQLite instead.
+
+   * Known URLs Database (known-urls.txt): A simple text file containing one
+     canonical URL per line. This is easy to read, write, and search.
+   * External Links Database (external-links.csv): A CSV (Comma-Separated
+     Values) file with three columns: source_article_key,link_text,external_url.
+     This is a standard, portable format.
 
 * Expected execution sequence
 
@@ -116,7 +130,8 @@ We will not download those again.  Ways to handle that are discussed below.
 
    The discovery tool will usually not run while the scraping pipeline is
    active, but it won't damage anything if it does. It might miss URLs
-   referenced by articles not yet fetched, though, so it should print a warning
+   referenced by articles not yet fetched, though, and in rare cases
+   might cause a duplicate fetch, so it should print a warning
    if it notices that the scraping pipeline is running.
 
 * Plan
