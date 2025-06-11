@@ -117,3 +117,6 @@
 *** Image handling:
   * Lazy-load avoidance with window.scroll emulation
   * Referer header spoofing for hotlinked assets
+
+* References
+   * [[https://substack.thewebscraping.club/][The Web Scraping Club substack]]
