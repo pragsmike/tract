@@ -1,0 +1,20 @@
+Sometimes, during fetch, the web server will refuse the request, but won't return 429 status.
+Instead, the web server will return a web page that contains only the text Too Many Requests plus some markup.
+I'm going to call these "short pages".
+
+Beware that some pages that arrived normally
+also contain that string, as part of their JavaScript, perhaps as some sort of error-handling code;
+such pages are not to be considered short pages.
+
+Apparently the web site does not send the status 429 when this happens,
+so we don't detect it, and the page gets processed as if it were normal.
+Here's a sample.  Some of the short pages have other markup, but they all contain that text.
+This was the file brad.html:
+<html><head><meta name="color-scheme" content="light dark"></head><body><pre style="word-wrap: break-word; white-space: pre-wrap;">Too Many Requests</pre></body></html>
+
+I want to do two things:
+  * find a way to detect the short page as soon as it's downloaded, before considering it a successful fetch,
+    and treat is the same as a 429 response.
+  * find a way to identify what URL produced a given short page, and create a job to fetch just those URLs.
+    We might have to brute-force this by taking the list of fetched URLs, deriving the name of the HTML file,
+    and comparing it to the short file's name.

@@ -2,7 +2,9 @@
   (:require [tract.pipeline :as pipeline]
             [tract.util :as util]
             [etaoin.api :as e]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [net.cgrand.enlive-html :as html]) ; <-- Add require for enlive
+  (:import [java.io StringReader])) ;<-- Add require for StringReader
 
 (def ^:private stage-name :fetch)
 (def ^:private next-stage-name :parser)
@@ -11,30 +13,39 @@
 (def ^:private base-throttle-ms 2500)
 (def ^:private random-throttle-ms 2000)
 
+(defn- is-short-error-page?
+  "Detects if the fetched HTML is a simple 'Too Many Requests' error page."
+  [html-string]
+  (let [html-len (count html-string)]
+    (if (and html-string (> 5000 html-len)) ; Only parse if it's a small page
+      (try
+        (let [parsed (html/html-resource (StringReader. html-string))
+              body-text (-> (html/select parsed [:body]) first html/text str/trim)]
+          (= body-text "Too Many Requests"))
+        (catch Exception _ false))
+      false)))
+
 (defn- exponential-backoff-ms [attempt]
   (let [base-wait (* (long (Math/pow 2 attempt)) 1000)
         random-jitter (rand-int 1500)]
     (+ base-wait random-jitter)))
 
-(defn- detect-429-error? [driver]
-  (try
-    (str/includes? (or (e/get-title driver) "") "Too Many Requests")
-    (catch Exception _ false)))
-
 (defn- fetch-html-with-retry! [driver url-str]
   (loop [attempt 0]
     (if (>= attempt max-fetch-retries)
       (throw (ex-info (str "Failed to fetch " url-str " after " max-fetch-retries " attempts.")
-                      {:url url-str :reason "Persistent 429 or other network error"}))
+                      {:url url-str :reason "Persistent network errors or rate-limiting"}))
       (do
         (println (str "\t-> Fetching article (attempt " (inc attempt) "): " url-str))
         (e/go driver url-str)
-        (if (detect-429-error? driver)
-          (let [wait-ms (exponential-backoff-ms attempt)]
-            (println (str "\t-> Detected 429. Waiting for " wait-ms "ms before retrying..."))
-            (Thread/sleep wait-ms)
-            (recur (inc attempt)))
-          (e/get-source driver))))))
+        (let [html-content (e/get-source driver)]
+          (if (is-short-error-page? html-content) ; <-- Our new check
+            (let [wait-ms (exponential-backoff-ms attempt)]
+              (println (str "\t-> Detected 'Too Many Requests' short page. Waiting for " wait-ms "ms..."))
+              (Thread/sleep wait-ms)
+              (recur (inc attempt)))
+            ;; Success! Return the valid HTML.
+            html-content))))))
 
 (defn- process-url-list-file!
   "Processes a single file containing a list of URLs using a persistent driver."
@@ -56,8 +67,7 @@
   (pipeline/move-to-done! file stage-name))
 
 (defn run-stage!
-  "Main entry point for the fetch stage.
-  Receives a pre-configured driver and processes all pending files."
+  "Main entry point for the fetch stage. Receives a pre-configured driver."
   [driver]
   (println "--- Running Fetch Stage ---")
   (let [pending-files (pipeline/get-pending-files stage-name)]
