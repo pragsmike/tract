@@ -11,8 +11,6 @@
 (def ^:private base-throttle-ms 2500)
 (def ^:private random-throttle-ms 2000)
 
-;; --- The login! function is now completely removed. ---
-
 (defn- exponential-backoff-ms [attempt]
   (let [base-wait (* (long (Math/pow 2 attempt)) 1000)
         random-jitter (rand-int 1500)]
@@ -26,10 +24,10 @@
 (defn- fetch-html-with-retry! [driver url-str]
   (loop [attempt 0]
     (if (>= attempt max-fetch-retries)
-      (throw (ex-info (str "Failed to fetch after " max-fetch-retries " attempts.")
-                      {:url url-str :reason "Persistent 429 errors"}))
+      (throw (ex-info (str "Failed to fetch " url-str " after " max-fetch-retries " attempts.")
+                      {:url url-str :reason "Persistent 429 or other network error"}))
       (do
-        (println (str "\t-> Fetching article: " url-str))
+        (println (str "\t-> Fetching article (attempt " (inc attempt) "): " url-str))
         (e/go driver url-str)
         (if (detect-429-error? driver)
           (let [wait-ms (exponential-backoff-ms attempt)]
@@ -38,26 +36,28 @@
             (recur (inc attempt)))
           (e/get-source driver))))))
 
-(defn- process-url-list-file! [driver file]
+(defn- process-url-list-file!
+  "Processes a single file containing a list of URLs using a persistent driver."
+  [driver file]
   (println (str "-> Processing url-list file: " (.getName file)))
-  (try
-    (let [urls (->> (slurp file)
-                    (str/split-lines)
-                    (remove str/blank?))]
-      (doseq [url urls]
+  (let [urls (->> (slurp file)
+                  (str/split-lines)
+                  (remove str/blank?))]
+    (doseq [url urls]
+      (try
         (let [sleep-duration (+ base-throttle-ms (rand-int random-throttle-ms))]
           (println (str "\t-> Waiting for " sleep-duration "ms..."))
           (Thread/sleep sleep-duration))
         (let [html-content (fetch-html-with-retry! driver url)
               output-filename (util/url->filename url)]
-          (pipeline/write-to-next-stage! html-content next-stage-name output-filename))))
-    (pipeline/move-to-done! file stage-name)
-    (catch Exception e
-      (pipeline/move-to-error! file stage-name e))))
+          (pipeline/write-to-next-stage! html-content next-stage-name output-filename))
+        (catch Exception e
+          (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e)))))))
+  (pipeline/move-to-done! file stage-name))
 
 (defn run-stage!
   "Main entry point for the fetch stage.
-  Receives a pre-connected driver and processes all pending files."
+  Receives a pre-configured driver and processes all pending files."
   [driver]
   (println "--- Running Fetch Stage ---")
   (let [pending-files (pipeline/get-pending-files stage-name)]
