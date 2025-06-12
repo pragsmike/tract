@@ -3,11 +3,8 @@
             [clojure.string :as str]
             [net.cgrand.enlive-html :as html]))
 
-;; --- Forward Declaration for Mutual Recursion ---
+;; ... (process-node and process-image-node are unchanged) ...
 (declare process-node)
-
-;; --- Node Processing Logic ---
-
 (defn- process-image-node [node article-key]
   (let [img-node (-> (html/select node [:img]) first)
         caption-node (-> (html/select node [:figcaption]) first)
@@ -27,7 +24,6 @@
         {:markdown (str "\n" (format "![%s](%s \"%s\")" (or (not-empty alt-text) caption) (str local-path) title-text) "\n"
                         (when (not-empty caption) (str "*" caption "*\n")))
          :images [image-job]}))))
-
 (defn- process-node [node article-key]
   (if (string? node)
     {:markdown node, :images []}
@@ -55,16 +51,25 @@
         :blockquote {:markdown (str "\n> " (str/replace content-md #"\n" "\n> ") "\n"), :images child-images}
         {:markdown content-md, :images child-images}))))
 
-;; --- Public API ---
+
+;; --- NEW HELPER and UPDATED FORMATTER ---
+
+(defn- escape-toml-string [s]
+  "Escapes double quotes for TOML string values."
+  (when s
+    (str/replace s "\"" "\\\"")))
 
 (defn- format-toml-front-matter [metadata]
-  (str "---\n"
-       (format "title = \"%s\"\n" (or (:title metadata) "Untitled"))
-       (format "author = \"%s\"\n" (:author metadata))
-       (format "article_key = \"%s\"\n" (:article_key metadata))
-       (format "publication_date = \"%s\"\n" (or (:publication_date metadata) "unknown"))
-       (format "source_url = \"%s\"\n" (or (:source_url metadata) "unknown"))
-       "---\n\n"))
+  (let [title (escape-toml-string (or (:title metadata) "Untitled"))
+        author (escape-toml-string (:author metadata))
+        source-url (escape-toml-string (or (:source_url metadata) "unknown"))]
+    (str "---\n"
+         (format "title = \"%s\"\n" title)
+         (format "author = \"%s\"\n" author)
+         (format "article_key = \"%s\"\n" (:article_key metadata))
+         (format "publication_date = \"%s\"\n" (or (:publication_date metadata) "unknown"))
+         (format "source_url = \"%s\"\n" source-url)
+         "---\n\n")))
 
 (defn compile-to-article
   "Takes parsed data and returns a map of final article data and image jobs."
