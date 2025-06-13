@@ -3,6 +3,16 @@
   (:import [java.net URL URLDecoder]
            [java.io File]))
 
+(defn canonicalize-url
+  "Removes query parameters and fragments from a URL string."
+  [url-str]
+  (when url-str
+    (-> url-str
+        (str/split #"#" 2) ; Split on fragment and take the first part
+        first
+        (str/split #"\?" 2) ; Split on query and take the first part
+        first)))
+
 (defn generate-article-key
   "Generates a unique file-safe key from article metadata."
   [{:keys [publication_date title]}]
@@ -16,7 +26,7 @@
 (defn url->local-path
   "Converts a potentially complex image URL into a clean local file path string."
   [image-url-str]
-  {:pre [(not (str/blank? image-url-str))]} ;; **FIXED**: Add pre-condition for safety
+  {:pre [(not (str/blank? image-url-str))]}
   (let [cdn-prefix "/https%3A"
         clean-url-str (if (str/includes? image-url-str cdn-prefix)
                         (let [start-index (str/last-index-of image-url-str cdn-prefix)]
@@ -30,7 +40,7 @@
 (defn url->filename
   "Creates a safe filename from a URL's path, suitable for fetched HTML."
   [url-str]
-  {:pre [(not (str/blank? url-str))]} ;; **FIXED**: Add pre-condition for safety
+  {:pre [(not (str/blank? url-str))]}
   (let [path (-> (new URL url-str) (.getPath))]
     (-> path
         (str/replace #"^/p/" "")

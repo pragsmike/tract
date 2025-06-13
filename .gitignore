@@ -7,4 +7,4 @@
 .lsp
 .cpcache
 work
-config.edn
+ignore-list.txt

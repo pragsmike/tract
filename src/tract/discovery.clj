@@ -4,7 +4,8 @@
             [toml-clj.core :as toml]
             [net.cgrand.enlive-html :as html]
             [clj-yaml.core :as yaml]
-            [clojure.set :as set])
+            [clojure.set :as set]
+            [tract.util :as util])
   (:import [java.io StringReader File]
            [java.net URL MalformedURLException]))
 
@@ -44,6 +45,7 @@
           front-matter-re #"(?ms)^---\n(.*?)\n---"
           front-matter-str (some-> (re-find front-matter-re content) second)]
       (when front-matter-str
+        ;; **FIXED**: Use the correct `read` function with a StringReader.
         (-> (StringReader. front-matter-str)
             (toml/read {:key-fn keyword})
             :source_url)))
@@ -51,17 +53,27 @@
       (println (str "WARN: Could not parse TOML from " (.getName file) ": " (.getMessage e)))
       nil)))
 
-(defn- build-known-urls-db []
+(defn- get-files-from-dir [dir-path extension]
+  (let [dir (io/file dir-path)]
+    (if (.exists dir)
+      (->> (.listFiles dir)
+           (filter #(and (.isFile %) (str/ends-with? (.getName %) extension))))
+      [])))
+
+(defn- build-known-urls-db
+  "Scans all relevant directories to build a set of all known URLs."
+  []
   (println "-> Building database of known URLs...")
-  (let [processed-urls (->> (io/file processed-dir)
-                            file-seq
-                            (filter #(str/ends-with? (.getName %) ".md"))
-                            (map extract-url-from-md-file))
-        fetch-job-urls (->> (concat (file-seq (io/file fetch-pending-dir))
-                                    (file-seq (io/file fetch-done-dir)))
-                            (filter #(str/ends-with? (.getName %) ".txt"))
-                            (mapcat #(str/split-lines (slurp %))))]
+  (let [processed-md-files (get-files-from-dir processed-dir ".md")
+        fetch-pending-txt-files (get-files-from-dir fetch-pending-dir ".txt")
+        fetch-done-txt-files (get-files-from-dir fetch-done-dir ".txt")
+
+        processed-urls (doall (map extract-url-from-md-file processed-md-files))
+        fetch-job-urls (doall (mapcat #(str/split-lines (slurp %))
+                                      (concat fetch-pending-txt-files fetch-done-txt-files)))]
+
     (->> (concat processed-urls fetch-job-urls)
+         (map util/canonicalize-url) ; Canonicalize all known URLs
          (remove nil?)
          (into #{}))))
 
@@ -122,20 +134,17 @@
         known-urls (build-known-urls-db)]
     (println (str "-> Loaded " (count ignore-list) " domains to ignore."))
     (write-known-urls-db! known-urls)
-
     (println "\n-> Scanning processed HTML files for new links...")
     (let [html-files (->> (io/file parser-done-dir) file-seq (filter #(.isFile %)))
-          ;; **FIXED**: Generate all links first, then filter them in a second step.
           unfiltered-links (for [html-file html-files
                                  :let [source-key (-> (.getName html-file) (str/replace #"\.html$" ""))]
                                  link (extract-links-from-html html-file)]
                              (assoc link :source_key source-key))
           all-links (remove #(is-ignored? (:href %) ignore-list) unfiltered-links)
           classified-links (group-by classify-link all-links)]
-
       (let [discovered-articles (->> (:substack_article classified-links)
                                      (map :href)
-                                     (map #(first (str/split % #"\?")))
+                                     (map util/canonicalize-url)
                                      set)
             external-links (:external classified-links)
             new-articles (set/difference discovered-articles known-urls)]
