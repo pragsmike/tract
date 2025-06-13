@@ -1,8 +1,9 @@
 (ns tract.pipeline
-  (:require [clojure.java.io :as io])
+  (:require [clojure.java.io :as io]
+            [tract.config :as config])
   (:import [java.io File]))
 
-(def base-dir "work")
+(def base-dir (config/work-dir))
 
 (defn- get-stage-dir ^File [stage-name]
   (io/file base-dir (name stage-name)))

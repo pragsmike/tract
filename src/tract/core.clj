@@ -1,8 +1,10 @@
+;; File: src/tract/core.clj
 (ns tract.core
   (:require [tract.pipeline :as pipeline]
             [tract.stages.job :as job]
             [tract.stages.fetch :as fetch]
             [tract.stages.parser :as parser]
+            [tract.config :as config] ; <--- ADDED
             [etaoin.api :as e]))
 
 (def stages [:job :fetch :parser])
@@ -17,9 +19,11 @@
   (println "--- Initialization Complete ---\n")
 
   (println "-> Connecting to existing Chrome browser on port 9222...")
+  ;; vvvv MODIFIED vvvv
   (let [driver (e/chrome {:capabilities
                           {:chromeOptions
-                           {:debuggerAddress "127.0.0.1:9222"}}})]
+                           {:debuggerAddress (config/browser-debugger-address)}}})]
+  ;; ^^^^ MODIFIED ^^^^
     (try
       (println "-> Successfully connected to browser. Assuming it is already logged in.")
 

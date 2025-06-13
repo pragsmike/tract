@@ -1,20 +1,20 @@
 (ns tract.discovery
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [toml-clj.core :as toml]
             [net.cgrand.enlive-html :as html]
             [clj-yaml.core :as yaml]
             [clojure.set :as set]
+            [tract.config :as config]
             [tract.util :as util])
-  (:import [java.io StringReader File]
+  (:import [java.io StringReader]
            [java.net URL MalformedURLException]))
 
-(def processed-dir "work/3-processed")
-(def parser-done-dir "work/parser/done")
-(def fetch-pending-dir "work/fetch/pending")
-(def fetch-done-dir "work/fetch/done")
-(def known-urls-db-file "work/known-urls.txt")
-(def external-links-db-file "work/external-links.csv")
+(def processed-dir (config/processed-dir-path))
+(def parser-done-dir (config/stage-dir-path :parser "done"))
+(def fetch-pending-dir (config/stage-dir-path :fetch "pending"))
+(def fetch-done-dir (config/stage-dir-path :fetch "done"))
+(def known-urls-db-file (str (io/file (config/work-dir) "known-urls.txt")))
+(def external-links-db-file (str (io/file (config/work-dir) "external-links.csv")))
 (def ignore-list-file "ignore-list.txt")
 
 (defn- read-ignore-list
@@ -45,12 +45,12 @@
           front-matter-re #"(?ms)^---\n(.*?)\n---"
           front-matter-str (some-> (re-find front-matter-re content) second)]
       (when front-matter-str
-        ;; **FIXED**: Use the correct `read` function with a StringReader.
-        (-> (StringReader. front-matter-str)
-            (toml/read {:key-fn keyword})
+        ;; vvvv REPLACED TOML parser with YAML parser vvvv
+        (-> (yaml/parse-string front-matter-str :keywords true)
             :source_url)))
     (catch Exception e
-      (println (str "WARN: Could not parse TOML from " (.getName file) ": " (.getMessage e)))
+      ;; This warning is now more relevant for malformed YAML
+      (println (str "WARN: Could not parse YAML from " (.getName file) ": " (.getMessage e)))
       nil)))
 
 (defn- get-files-from-dir [dir-path extension]
@@ -142,6 +142,7 @@
                              (assoc link :source_key source-key))
           all-links (remove #(is-ignored? (:href %) ignore-list) unfiltered-links)
           classified-links (group-by classify-link all-links)]
+
       (let [discovered-articles (->> (:substack_article classified-links)
                                      (map :href)
                                      (map util/canonicalize-url)

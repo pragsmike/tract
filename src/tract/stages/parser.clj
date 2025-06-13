@@ -2,12 +2,13 @@
   (:require [tract.pipeline :as pipeline]
             [tract.parser :as parser-logic]
             [tract.compiler :as compiler]
+            [tract.config :as config]
             [tract.io :as io]
             [clojure.java.io :as jio])
   (:gen-class)) ; <-- Add :gen-class to make it an AOT-compilable main namespace
 
 (def ^:private stage-name :parser)
-(def ^:private output-dir "work/3-processed")
+(def ^:private output-dir (config/processed-dir-path))
 
 (defn- process-html-file!
   "Processes a single HTML file from the pending directory."

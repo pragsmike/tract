@@ -1,10 +1,9 @@
 (ns tract.compiler
   (:require [tract.util :as util]
             [clojure.string :as str]
-            [net.cgrand.enlive-html :as html]))
+            [net.cgrand.enlive-html :as html]
+            [clj-yaml.core :as yaml]))
 
-;; ... (process-node and process-image-node are unchanged) ...
-(declare process-node)
 (defn- process-image-node [node article-key]
   (let [img-node (-> (html/select node [:img]) first)
         caption-node (-> (html/select node [:figcaption]) first)
@@ -17,13 +16,14 @@
       (let [local-path (util/url->local-path img-src)
             image-job {:article_key article-key
                        :image_source_url img-src
-                       :image_path (str local-path)
+                       :image_path local-path
                        :alt alt-text
                        :title title-text
                        :caption caption}]
-        {:markdown (str "\n" (format "![%s](%s \"%s\")" (or (not-empty alt-text) caption) (str local-path) title-text) "\n"
+        {:markdown (str "\n" (format "![%s](%s \"%s\")" (or (not-empty alt-text) caption) local-path title-text) "\n"
                         (when (not-empty caption) (str "*" caption "*\n")))
          :images [image-job]}))))
+
 (defn- process-node [node article-key]
   (if (string? node)
     {:markdown node, :images []}
@@ -54,22 +54,18 @@
 
 ;; --- NEW HELPER and UPDATED FORMATTER ---
 
-(defn- escape-toml-string [s]
-  "Escapes double quotes for TOML string values."
-  (when s
-    (str/replace s "\"" "\\\"")))
-
-(defn- format-toml-front-matter [metadata]
-  (let [title (escape-toml-string (or (:title metadata) "Untitled"))
-        author (escape-toml-string (:author metadata))
-        source-url (escape-toml-string (or (:source_url metadata) "unknown"))]
+(defn- format-yaml-front-matter
+  "Takes a metadata map and returns a YAML front matter string."
+  [metadata]
+  (let [;; Select and order the keys for consistent output.
+        ;; :keywordize-keys false is important for clean YAML output.
+        front-matter-data (select-keys metadata [:title :author :article_key :publication_date :source_url])
+        yaml-string (yaml/generate-string front-matter-data
+                                          :dumper-options {:flow-style :block})]
     (str "---\n"
-         (format "title = \"%s\"\n" title)
-         (format "author = \"%s\"\n" author)
-         (format "article_key = \"%s\"\n" (:article_key metadata))
-         (format "publication_date = \"%s\"\n" (or (:publication_date metadata) "unknown"))
-         (format "source_url = \"%s\"\n" source-url)
+         yaml-string
          "---\n\n")))
+
 
 (defn compile-to-article
   "Takes parsed data and returns a map of final article data and image jobs."
@@ -84,12 +80,17 @@
                       :else
                       (str "unknown-article_" (System/currentTimeMillis)))
 
-        full-metadata (assoc metadata :article_key article-key)
+        full-metadata (assoc metadata
+                             :title (or (:title metadata) "Untitled")
+                             :publication_date (or (:publication_date metadata) "unknown")
+                             :source_url (or (:source_url metadata) "unknown")
+                             :article_key article-key)
         {:keys [markdown images]} (process-node {:tag :div :content body-nodes} article-key)
         final-markdown (-> markdown
                            (str/replace #"(?m)^\s*$\n" "")
                            str/trim)
-        front-matter (format-toml-front-matter full-metadata)]
+        front-matter (format-yaml-front-matter full-metadata)]
     {:article {:metadata full-metadata
                :markdown (str front-matter final-markdown)}
      :images images}))
+

@@ -1,6 +1,7 @@
 (ns tract.stages.fetch
   (:require [tract.pipeline :as pipeline]
             [tract.util :as util]
+            [tract.config :as config]
             [etaoin.api :as e]
             [clojure.string :as str]
             [net.cgrand.enlive-html :as html]) ; <-- Add require for enlive
@@ -9,9 +10,6 @@
 (def ^:private stage-name :fetch)
 (def ^:private next-stage-name :parser)
 
-(def ^:private max-fetch-retries 5)
-(def ^:private base-throttle-ms 2500)
-(def ^:private random-throttle-ms 2000)
 
 (defn- is-short-error-page?
   "Detects if the fetched HTML is a simple 'Too Many Requests' error page."
@@ -32,8 +30,8 @@
 
 (defn- fetch-html-with-retry! [driver url-str]
   (loop [attempt 0]
-    (if (>= attempt max-fetch-retries)
-      (throw (ex-info (str "Failed to fetch " url-str " after " max-fetch-retries " attempts.")
+    (if (>= attempt (config/fetch-max-retries))
+      (throw (ex-info (str "Failed to fetch " url-str " after " (config/fetch-max-retries) " attempts.")
                       {:url url-str :reason "Persistent network errors or rate-limiting"}))
       (do
         (println (str "\t-> Fetching article (attempt " (inc attempt) "): " url-str))
@@ -56,7 +54,10 @@
                   (remove str/blank?))]
     (doseq [url urls]
       (try
-        (let [sleep-duration (+ base-throttle-ms (rand-int random-throttle-ms))]
+        (let [base-ms (config/fetch-throttle-base-ms)
+              random-ms (config/fetch-throttle-random-ms)
+              sleep-duration (+ base-ms (rand-int random-ms))]
+
           (println (str "\t-> Waiting for " sleep-duration "ms..."))
           (Thread/sleep sleep-duration))
         (let [html-content (fetch-html-with-retry! driver url)

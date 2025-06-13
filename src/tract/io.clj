@@ -1,20 +1,20 @@
 (ns tract.io
   (:require [clj-http.lite.client :as client]
             [clojure.java.io :as io]
-            [cheshire.core :as json]))
-
-(def ^:private base-throttle-ms 2000)
-(def ^:private random-throttle-ms 1500)
+            [cheshire.core :as json]
+            [tract.config :as config]))
 
 (defn throttled-fetch!
   "Fetches the body of a URL after a polite, randomized delay.
   Returns the response body as a string. Throws on error."
   [url]
-  (let [sleep-duration (+ base-throttle-ms (rand-int random-throttle-ms))]
-    (println (str "\t-> Waiting for " sleep-duration "ms..."))
-    (Thread/sleep sleep-duration)
-    (println (str "\t-> Fetching feed/data from " url))
-    (:body (client/get url))))
+  (let [base-ms (config/http-throttle-base-ms)
+        random-ms (config/http-throttle-random-ms)
+        sleep-duration (+ base-ms (rand-int random-ms))]
+       (println (str "\t-> Waiting for " sleep-duration "ms..."))
+       (Thread/sleep sleep-duration)
+       (println (str "\t-> Fetching feed/data from " url))
+       (:body (client/get url))))
 
 (defn write-article!
   "Writes the complete article markdown file."
