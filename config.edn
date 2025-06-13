@@ -1,0 +1,30 @@
+;; File: config.edn
+{
+ ;; --- General Settings ---
+ ;; The root directory for all pipeline operations.
+ :work-dir "work"
+
+ ;; --- Browser & Fetching ---
+ ;; The address of the pre-launched Chrome browser in remote debugging mode.
+ :browser-debugger-address "127.0.0.1:9222"
+
+ ;; --- Stage-specific Settings ---
+
+ ;; Configuration for the main article fetch stage (using etaoin)
+ :fetch-stage {
+               ;; Base wait time in milliseconds before a fetch
+               :throttle-base-ms 2500
+               ;; Random additional wait time (0 to this value)
+               :throttle-random-ms 2000
+               ;; Max number of retries for a single URL on 'Too Many Requests' errors
+               :max-retries 5
+               }
+
+ ;; Configuration for simple HTTP requests (feeds, images)
+ :http-client {
+               ;; Base wait time for feed fetches
+               :throttle-base-ms 2000
+               ;; Random additional wait time for feed fetches
+               :throttle-random-ms 1500
+               }
+}
