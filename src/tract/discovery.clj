@@ -14,6 +14,29 @@
 (def fetch-done-dir "work/fetch/done")
 (def known-urls-db-file "work/known-urls.txt")
 (def external-links-db-file "work/external-links.csv")
+(def ignore-list-file "ignore-list.txt")
+
+(defn- read-ignore-list
+  "Reads the ignore-list.txt file into a set of hostnames."
+  []
+  (let [file (io/file ignore-list-file)]
+    (if (.exists file)
+      (->> (slurp file)
+           str/split-lines
+           (remove #(or (str/blank? %) (str/starts-with? % "#")))
+           (map str/trim)
+           set)
+      #{})))
+
+(defn- is-ignored?
+  "Checks if a given URL's host is on the ignore list."
+  [href-str ignore-set]
+  (try
+    (let [host (.getHost (new URL href-str))
+          substack-subdomain (first (str/split host #"\."))]
+      (or (contains? ignore-set host)
+          (contains? ignore-set substack-subdomain)))
+    (catch MalformedURLException _ true)))
 
 (defn- extract-url-from-md-file [file]
   (try
@@ -28,32 +51,20 @@
       (println (str "WARN: Could not parse TOML from " (.getName file) ": " (.getMessage e)))
       nil)))
 
-(defn- get-files-from-dir [dir-path extension]
-  (let [dir (io/file dir-path)]
-    (if (.exists dir)
-      (->> (.listFiles dir)
-           (filter #(and (.isFile %) (str/ends-with? (.getName %) extension))))
-      [])))
-
-(defn- build-known-urls-db
-  "Scans all relevant directories to build a set of all known URLs."
-  []
+(defn- build-known-urls-db []
   (println "-> Building database of known URLs...")
-  (let [;; **FIXED**: More robust and explicit file gathering.
-        processed-md-files (get-files-from-dir processed-dir ".md")
-        fetch-pending-txt-files (get-files-from-dir fetch-pending-dir ".txt")
-        fetch-done-txt-files (get-files-from-dir fetch-done-dir ".txt")
-
-        processed-urls (doall (map extract-url-from-md-file processed-md-files))
-        fetch-job-urls (doall (mapcat #(str/split-lines (slurp %))
-                                      (concat fetch-pending-txt-files fetch-done-txt-files)))]
-
+  (let [processed-urls (->> (io/file processed-dir)
+                            file-seq
+                            (filter #(str/ends-with? (.getName %) ".md"))
+                            (map extract-url-from-md-file))
+        fetch-job-urls (->> (concat (file-seq (io/file fetch-pending-dir))
+                                    (file-seq (io/file fetch-done-dir)))
+                            (filter #(str/ends-with? (.getName %) ".txt"))
+                            (mapcat #(str/split-lines (slurp %))))]
     (->> (concat processed-urls fetch-job-urls)
          (remove nil?)
          (into #{}))))
 
-
-;; ... (The rest of the file is correct and unchanged) ...
 (defn- write-known-urls-db! [known-urls]
   (let [db-file (io/file known-urls-db-file)]
     (println (str "-> Writing " (count known-urls) " unique URLs to " db-file))
@@ -104,17 +115,24 @@
     (println "-> No new undiscovered articles found.")))
 
 (defn -main
+  "Main entry point for the discovery tool."
   [& args]
   (println "--- Running Discovery Tool ---")
-  (let [known-urls (build-known-urls-db)]
+  (let [ignore-list (read-ignore-list)
+        known-urls (build-known-urls-db)]
+    (println (str "-> Loaded " (count ignore-list) " domains to ignore."))
     (write-known-urls-db! known-urls)
+
     (println "\n-> Scanning processed HTML files for new links...")
     (let [html-files (->> (io/file parser-done-dir) file-seq (filter #(.isFile %)))
-          all-links (for [html-file html-files
-                          :let [source-key (-> (.getName html-file) (str/replace #"\.html$" ""))]
-                          link (extract-links-from-html html-file)]
-                      (assoc link :source_key source-key))
+          ;; **FIXED**: Generate all links first, then filter them in a second step.
+          unfiltered-links (for [html-file html-files
+                                 :let [source-key (-> (.getName html-file) (str/replace #"\.html$" ""))]
+                                 link (extract-links-from-html html-file)]
+                             (assoc link :source_key source-key))
+          all-links (remove #(is-ignored? (:href %) ignore-list) unfiltered-links)
           classified-links (group-by classify-link all-links)]
+
       (let [discovered-articles (->> (:substack_article classified-links)
                                      (map :href)
                                      (map #(first (str/split % #"\?")))
