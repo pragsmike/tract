@@ -2,3 +2,7 @@ This directory contains a mix of prompts and responses from my conversation with
 where it acted as a design and coding partner.
 
 In [[reflection.md]] it expresses its appreciation that I treated it as a partner and not just a code generator :)
+
+The onboard documents were produced by the AI to inform a new, fresh instance of itself on how to proceed.
+I did this when I decided the existing instance had "aged" and was beginning to struggle to follow the plot
+due to context overflow, and the web UI got annoyingly sluggish.
