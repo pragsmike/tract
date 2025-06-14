@@ -1,27 +1,37 @@
 (ns tract.util
   (:require [clojure.string :as str])
   (:import [java.net URL URLDecoder]
-           [java.io File]))
+           [java.io File]
+           [java.time LocalDate]))
 
 (defn canonicalize-url
   "Removes query parameters and fragments from a URL string."
   [url-str]
   (when url-str
     (-> url-str
-        (str/split #"#" 2) ; Split on fragment and take the first part
+        (str/split #"#" 2)
         first
-        (str/split #"\?" 2) ; Split on query and take the first part
+        (str/split #"\?" 2)
         first)))
+
+;; vvvv NEW HELPER FUNCTION TO ENABLE TESTING vvvv
+(defn- current-date-string []
+  "Returns the current date as an ISO_LOCAL_DATE string.
+  Exists as a separate function to be mockable in tests."
+  (.toString (LocalDate/now)))
+;; ^^^^ NEW HELPER FUNCTION ^^^^
 
 (defn generate-article-key
   "Generates a unique file-safe key from article metadata."
   [{:keys [publication_date title]}]
-  (let [date-part (or publication_date (.toString (java.time.LocalDate/now)))
+  ;; vvvv MODIFIED TO USE THE NEW HELPER vvvv
+  (let [date-part (or publication_date (current-date-string))
         full-slug (-> (str/lower-case (or title "untitled"))
                       (str/replace #"[^a-z0-9\s-]" "")
                       (str/replace #"\s+" "-"))
         slug (subs full-slug 0 (min (count full-slug) 50))]
     (str date-part "_" slug)))
+  ;; ^^^^ MODIFIED ^^^^
 
 (defn url->local-path
   "Converts a potentially complex image URL into a clean local file path string."

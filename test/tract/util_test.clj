@@ -2,8 +2,7 @@
   (:require [clojure.test :refer :all]
             [tract.util :as util]
             [clojure.string :as str])
-  (:import [java.io File]
-           [java.time LocalDate]))
+  (:import [java.io File]))
 
 (deftest canonicalize-url-test
   (testing "Canonicalization of URLs"
@@ -22,23 +21,26 @@
 
     (testing "with a long title"
       (let [metadata {:publication_date "2023-10-27"
-                      :title "This is a very very long title that absolutely must be truncated for filesystem safety"}]
-        (is (= "2023-10-27_this-is-a-very-very-long-title-that-absolutely-m"
-               (util/generate-article-key metadata)))
-        (is (< 60 (count (util/generate-article-key metadata))))))
+                      :title "This is a very very long title that absolutely must be truncated for filesystem safety"}
+            generated-key (util/generate-article-key metadata)]
+        ;; vvvv CORRECTED ASSERTION vvvv
+        (is (= "2023-10-27_this-is-a-very-very-long-title-that-absolutely-mus"
+               generated-key))
+        ;; Also make this assertion more precise. 10(date) + 1(_) + 50(slug) = 61
+        (is (= 61 (count generated-key)))))
+        ;; ^^^^ CORRECTED ASSERTION ^^^^
 
     (testing "with only a date"
       (let [metadata {:publication_date "2023-10-27"}]
         (is (= "2023-10-27_untitled" (util/generate-article-key metadata)))))
 
     (testing "with only a title"
-      ;; Use with-redefs to make the test deterministic
-      (with-redefs [java.time.LocalDate/now (fn [] (LocalDate/parse "2025-01-01"))]
+      (with-redefs [tract.util/current-date-string (fn [] "2025-01-01")]
         (let [metadata {:title "A Title With No Date"}]
           (is (= "2025-01-01_a-title-with-no-date" (util/generate-article-key metadata))))))
 
     (testing "with no metadata"
-      (with-redefs [java.time.LocalDate/now (fn [] (LocalDate/parse "2025-01-01"))]
+      (with-redefs [tract.util/current-date-string (fn [] "2025-01-01")]
         (let [metadata {}]
           (is (= "2025-01-01_untitled" (util/generate-article-key metadata))))))))
 
