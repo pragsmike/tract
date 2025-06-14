@@ -1,14 +1,14 @@
 (ns tract.stages.job
   (:require [tract.pipeline :as pipeline]
-            [tract.io :as io]
+            [tract.io :as tio]
+            [clojure.java.io :as io]
             [tract.config :as config]
             [clj-yaml.core :as yaml]
             [clojure.string :as str]
             [clojure.data.xml :as xml]
             [clojure.set :as set])
   (:import [java.time LocalDate]
-           [java.time.format DateTimeFormatter]
-           [java.time.temporal TemporalAccessor]))
+           [java.time.format DateTimeFormatter]))
 
 (def ^:private stage-name :job)
 (def ^:private next-stage-name :fetch)
@@ -23,8 +23,9 @@
                              temporal-accessor (.parse formatter date-str)]
                          (.format (LocalDate/from temporal-accessor) DateTimeFormatter/ISO_LOCAL_DATE)))})
 
-(defn- read-completed-urls []
+(defn- read-completed-urls
   "Reads the completed.log into a set. Handles file-not-found."
+  []
   (let [file (io/file completed-log-file)]
     (if (.exists file)
       (->> (slurp file)
@@ -39,7 +40,7 @@
 
 (defn- process-feed-url!
   [feed-url date-range]
-  (let [xml-string (io/throttled-fetch! feed-url)
+  (let [xml-string (tio/throttled-fetch! feed-url)
         parsed-xml (xml/parse-str xml-string)
         root-tag (:tag parsed-xml)
         tag-link? #(= :link (:tag %))]

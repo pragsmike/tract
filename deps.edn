@@ -20,7 +20,7 @@
   :convert-fm {:main-opts ["-m" "convert-front-matter"]}
   :backfill-meta {:main-opts ["-m" "backfill-meta"]}
   :populate-completed-log {:main-opts ["-m" "populate-completed-log"]}
-
+  :prune {:main-opts ["-m" "prune-ignored"]}
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
