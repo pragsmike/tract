@@ -1,7 +1,7 @@
 ## `tract`: A Developer's Guide & Design Document
 
-**Version:** 1.0
-**Status:** Core Engine Complete
+**Version:** 1.1
+**Status:** Core Engine Complete, Curation Tools Added
 
 ### 1. Introduction
 
@@ -9,7 +9,15 @@
 
 The system is built as a robust, resilient, file-based pipeline, capable of handling both public and authenticated (subscriber-only) content. It is designed to be polite by throttling its network requests and to be extensible for supporting new sources and features in the future.
 
-This document serves as the primary technical guide for developers working on `tract`. It assumes a developer may be new to Clojure and explains the architectural decisions and conventions used throughout the codebase.
+This document serves as the primary **technical guide** for developers working on `tract`. For a user-focused guide on how to operate the application, please see **[USAGE.md](./USAGE.md)**.
+
+### Project Design Documents
+
+This document describes the core architecture. For detailed designs of specific, standalone components, please see:
+
+-   **[This Document](./DESIGN.md):** The core architecture, philosophy, and pipeline design.
+-   **[Article Discovery](./DESIGN-discovery.md):** The design of the `discover` tool.
+-   **[Corpus Pruning](./DESIGN-prune.md):** The design of the `prune` tool.
 
 ### 2. Core Philosophy & Architecture
 
@@ -43,75 +51,59 @@ The pipeline is coordinated by the main function in `tract.core`, which runs eac
 #### Stage 1: The `job` Stage
 *   **Runner:** `tract.stages.job/run-stage!`
 *   **Input:** A `.yaml` file in `work/job/pending/`.
-*   **Function:** Translates a high-level request (e.g., "all articles by this author") into a concrete list of URLs. It uses a throttled HTTP client (`clj-http-lite`) to efficiently fetch and parse Atom/RSS feeds.
-*   **Output:** A `.txt` file containing one URL per line, written to `work/fetch/pending/`.
+*   **Function:** Translates a high-level request (e.g., "all articles by this author") into a concrete list of URLs. It uses a throttled HTTP client (`clj-http-lite`) to efficiently fetch and parse Atom/RSS feeds. **It filters this list against `work/completed.log` to ensure articles are not re-processed.**
+*   **Output:** A `.txt` file containing a list of new URLs, written to `work/fetch/pending/`.
 
 #### Stage 2: The `fetch` Stage
 *   **Runner:** `tract.stages.fetch/run-stage!`
 *   **Input:** A `.txt` file from `work/fetch/pending/`.
-*   **Function:** Fetches the full HTML content for each URL. This stage uses **`etaoin` to drive a persistent, authenticated browser session**, which is essential for bypassing anti-bot measures and accessing subscriber-only content. It throttles its requests to be polite.
-*   **Output:** One `.html` file per URL, written to `work/parser/pending/`.
+*   **Function:** Fetches the full HTML content for each URL using a persistent, authenticated browser session. This is essential for bypassing anti-bot measures and accessing subscriber-only content.
+*   **Output:** One `.html` file per URL and a corresponding `.html.meta` companion file, written to `work/parser/pending/`.
 
 #### Stage 3: The `parser` Stage
 *   **Runner:** `tract.stages.parser/run-stage!`
 *   **Input:** An `.html` file from `work/parser/pending/`.
 *   **Function:** The core extraction engine. It orchestrates the `parser`, `compiler`, and `io` namespaces to perform the full extraction.
-*   **Output:** The final artifacts (`.md` file, images, and `.json` metadata) written to the `work/3-processed/` directory.
+*   **Output:** The final artifacts (`.md` file, images, and `.json` metadata) written to the `work/3-processed/` directory. **Upon successful processing, it appends the article's `source_url` to `work/completed.log`, marking it as complete.**
 
 ### 4. Namespace Breakdown (The Code Map)
 
-*   `tract.core`: The master orchestrator. Its `-main` function initializes the pipeline and runs each stage in order. It also manages the lifecycle of the persistent browser driver.
+*   `tract.core`: The master orchestrator. Its `-main` function initializes the pipeline, manages the browser driver lifecycle, and runs each stage in order.
 *   `tract.pipeline`: Provides the common utility functions for the file-based workflow (`get-pending-files`, `move-to-done!`, `move-to-error!`, etc.).
-*   `tract.config`: Safely reads the `~/secrets/tract-config.edn` file for authentication credentials.
+*   `tract.config`: Safely reads the `config.edn` file and provides access to configuration values with sensible defaults.
 
 *   `tract.stages.job`: The runner for the job stage.
-*   `tract.stages.fetch`: The runner for the fetch stage. Contains the public `login!` function.
+*   `tract.stages.fetch`: The runner for the fetch stage.
 *   `tract.stages.parser`: The runner for the parser stage.
 
-*   `tract.parser`: (Logic) Contains pure functions for parsing an HTML string into structured Clojure data (`{:metadata ... :body-nodes ...}`). Includes fallbacks for non-Substack pages.
-*   `tract.compiler`: (Logic) The pure, unit-tested core of the application. Takes the data from the parser and "compiles" it into a final map containing the complete Markdown string and a list of image-processing jobs.
-*   `tract.io`: (Side-Effects) The only place where we interact with the network or write final files. Contains `throttled-fetch!`, `write-article!`, and `download-image!`.
-*   `tract.util`: (Logic) A collection of small, pure helper functions for generating keys and manipulating paths (`generate-article-key`, `url->local-path`, etc.).
+*   `tract.parser`: (Logic) Contains pure functions for parsing an HTML string into structured Clojure data (`{:metadata ... :body-nodes ...}`).
+*   `tract.compiler`: (Logic) The pure, unit-tested core of the application. Takes the data from the parser and "compiles" it into a final map containing the complete Markdown string (with YAML front matter) and a list of image-processing jobs.
+*   `tract.io`: (Side-Effects) The only place where we interact with the network for non-browser requests or write final files.
+*   `tract.util`: (Logic) A collection of small, pure helper functions for generating keys, canonicalizing URLs, and manipulating paths.
 
 ### 5. How to Run the Application
 
-#### 5.1. One-Time Setup: Browser Authentication
-
-`tract` uses a persistent, authenticated browser session to avoid anti-bot systems. This requires a one-time manual setup.
-
-1.  **Launch Chrome in Debugging Mode:** From your terminal (WSL2 in our case), start Chrome with the remote debugging flag.
-    ```bash
-    # Adjust path as needed for your Windows system
-    /mnt/c/Program\ Files/Google/Chrome/Application/chrome.exe --remote-debugging-port=9222
-    ```
-2.  **Manually Log In:** A new Chrome window will open. In this window, navigate to `substack.com` and log in with the account you want to use for scraping. Solve any CAPTCHAs that appear.
-3.  **Leave it Running:** You can minimize this browser window. `tract` will connect to it whenever it runs. You only need to do this once per login session (i.e., every few days or weeks).
-
-#### 5.2. Running a Job
-
-1.  Create a `.yaml` jobspec file in `work/job/pending/`.
-2.  From the project root, run `clj -M:run` or `make`.
-3.  The pipeline will execute, and final artifacts will appear in `work/3-processed/`.
+The `tract` application is operated via a set of `make` commands that provide a simple interface to the underlying Clojure tools. For a detailed guide on setup, configuration, and day-to-day operation, please see the **[USAGE.md](./USAGE.md)** user manual.
 
 ### 6. The "Graveyard": Lessons Learned & Paths Not Taken
 
 Our development process was iterative and involved several dead ends. These are documented here so that future developers can understand the "why" behind our final design and avoid repeating these mistakes.
 
 *   **Problem: Brittle Login Automation vs. Anti-Bot**
-    *   **Path Taken:** We initially tried to fully automate the login flow by finding and filling the email/password fields. This repeatedly failed because Substack's anti-bot layer (Kasada) is designed to detect exactly this kind of headless automation. It would not display the password field, or it would present a CAPTCHA.
-    *   **Lesson & Final Solution:** Automating a login against a modern, protected site is extremely fragile. The final architecture, which **connects to a pre-authenticated, persistent browser session**, is vastly more robust, simpler to code, and more reliable.
+    *   **Path Taken:** We initially tried to fully automate the login flow. This repeatedly failed because Substack's anti-bot layer (Kasada) is designed to detect exactly this kind of headless automation.
+    *   **Lesson & Final Solution:** The final architecture, which **connects to a pre-authenticated, persistent browser session**, is vastly more robust, simpler to code, and more reliable.
 
 *   **Problem: `etaoin` Driver Lifecycle & Zombie Processes**
-    *   **Path Taken:** We first tried creating and destroying a new browser instance for every single fetch. In the WSL2 environment, if the script crashed, the background `chromedriver` process was orphaned, leading to a "user data directory is already in use" error on the next run.
-    *   **Lesson & Final Solution:** The browser driver's lifecycle must be managed at the highest possible level. Our final design creates a single driver in `tract.core/-main`, wraps the entire pipeline run in a `try...finally` block, and guarantees the driver is properly disconnected (`e/quit`) no matter what happens.
+    *   **Path Taken:** We first tried creating and destroying a new browser instance for every single fetch. In the WSL2 environment, this led to orphaned `chromedriver` processes.
+    *   **Lesson & Final Solution:** The browser driver's lifecycle must be managed at the highest possible level. Our final design creates a single driver in `tract.core/-main`, wraps the entire pipeline run in a `try...finally` block, and guarantees the driver is properly disconnected or killed, no matter what happens.
 
-*   **Problem: Clojure/`etaoin` API & Syntax Errors**
-    *   **Path Taken:** Early development was plagued by compilation errors due to using incorrect or non-existent function names from the `etaoin` library (`e/fill-by-keys`, `e/find-element`, etc.).
-    *   **Lesson & Final Solution:** An AI assistant's knowledge of a specific library's API can be faulty. The final, working code was achieved by consulting the official documentation and correcting the function calls (`e/chrome` with `:debuggerAddress`, using `e/wait` and `e/fill-el` for typing). Always trust the compiler and verify with official docs.
+*   **Problem: AI Assistant API & Syntax Errors**
+    *   **Path Taken:** Early development was plagued by compilation errors due to using incorrect or non-existent function names from libraries, or by generating syntactically invalid Clojure code.
+    *   **Lesson & Final Solution:** An AI assistant's knowledge can be flawed. The final, working code was achieved through a process of generating proposals, having a human test them rigorously, and iterating on the bug reports. Always trust the compiler over the AI's confidence.
 
-*   **Problem: Brittle Parser Logic**
-    *   **Path Taken:** The initial parser was designed only for Substack's structure. When it encountered a non-Substack page or a server error page, it returned `nil` for metadata fields, causing `NullPointerException`s downstream.
-    *   **Lesson & Final Solution:** A robust parser must be defensive. The final parser now has multiple fallbacks (JSON-LD -> Meta Tags -> `<title>`) and the compiler has last-resort fallbacks for generating keys (e.g., using a timestamp). This ensures the pipeline can process any valid HTML file without crashing.
+*   **Problem: Manual vs. Library-based Data Serialization**
+    *   **Path Taken:** The first version of the Markdown compiler used manual string formatting to create TOML front matter. This was brittle and failed to correctly escape special characters.
+    *   **Lesson & Final Solution:** Never build your own serializer for a standard format. The final design uses the `clj-yaml` library to robustly generate YAML front matter, which is guaranteed to be syntactically correct.
 
 ### 7. How to Extend `tract`
 
@@ -126,9 +118,7 @@ The current architecture is designed for extension.
     1.  Go to `src/tract/parser.clj`.
     2.  Add new fallback logic to the `extract-metadata` and `extract-body-nodes` functions to recognize the specific HTML structure of the new site.
 
-*   **To Add a New Pipeline Stage (e.g., a "Notifier"):**
-    1.  Create `src/tract/stages/notifier.clj` with a `run-stage!` function.
-    2.  Update `tract.core` to add `:notifier` to the `stages` vector and call its `run-stage!` function at the end of the pipeline.
-
-*   **To Add a Caching Proxy:**
-    1.  The place to configure this would be in `tract.core`, where the `etaoin` driver is created, and in `tract.io`, where the `clj-http-lite` calls are made. Both tools would need to be configured to use the proxy address.
+*   **To Add a New Standalone Utility (like `discover` or `prune`):**
+    1.  Create a new main namespace in the `scripts/` directory.
+    2.  Create a new `DESIGN-[utility-name].md` document to describe its purpose and architecture.
+    3.  Add a corresponding alias to `deps.edn` and a command to the `Makefile`.
