@@ -46,7 +46,11 @@
   [^File file stage-name]
   (println (str "-> Archiving " (.getName file) " to done."))
   (let [done-dir (-> stage-name get-stage-dir (get-subdir "done"))]
-    (move-file! file done-dir)))
+    (move-file! file done-dir)
+    (let [meta-file (io/file (str (.getAbsolutePath file) ".meta"))]
+      (when (.exists meta-file)
+        (println (str "-> Archiving associated meta file: " (.getName meta-file)))
+        (move-file! meta-file done-dir)))))
 
 (defn move-to-error!
   "Moves a file to a stage's error dir and writes an error report."
@@ -56,4 +60,9 @@
         error-report-file (io/file error-dir (str (.getName file) ".error"))
         error-report-content (with-out-str (.printStackTrace exception))]
     (move-file! file error-dir)
-    (spit error-report-file error-report-content)))
+    (spit error-report-file error-report-content)
+    (let [meta-file (io/file (str (.getAbsolutePath file) ".meta"))]
+      (when (.exists meta-file)
+        (println (str "-> Moving associated meta file to error: " (.getName meta-file)))
+        (move-file! meta-file error-dir)))))
+

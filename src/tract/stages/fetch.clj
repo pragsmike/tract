@@ -4,12 +4,12 @@
             [tract.config :as config]
             [etaoin.api :as e]
             [clojure.string :as str]
-            [net.cgrand.enlive-html :as html]) ; <-- Add require for enlive
-  (:import [java.io StringReader])) ;<-- Add require for StringReader
+            [net.cgrand.enlive-html :as html]
+            [cheshire.core :as json])
+  (:import [java.io StringReader]))
 
 (def ^:private stage-name :fetch)
 (def ^:private next-stage-name :parser)
-
 
 (defn- is-short-error-page?
   "Detects if the fetched HTML is a simple 'Too Many Requests' error page."
@@ -37,13 +37,21 @@
         (println (str "\t-> Fetching article (attempt " (inc attempt) "): " url-str))
         (e/go driver url-str)
         (let [html-content (e/get-source driver)]
-          (if (is-short-error-page? html-content) ; <-- Our new check
+          (if (is-short-error-page? html-content)
             (let [wait-ms (exponential-backoff-ms attempt)]
               (println (str "\t-> Detected 'Too Many Requests' short page. Waiting for " wait-ms "ms..."))
               (Thread/sleep wait-ms)
               (recur (inc attempt)))
-            ;; Success! Return the valid HTML.
             html-content))))))
+
+(defn- write-meta-file!
+  "Writes a .meta file for a corresponding HTML file."
+  [url output-filename]
+  (let [meta-filename (str output-filename ".meta")
+        meta-content {:source_url url
+                      :fetch_timestamp (.toString (java.time.Instant/now))}
+        json-content (json/generate-string meta-content {:pretty true})]
+    (pipeline/write-to-next-stage! json-content :parser meta-filename)))
 
 (defn- process-url-list-file!
   "Processes a single file containing a list of URLs using a persistent driver."
@@ -57,12 +65,14 @@
         (let [base-ms (config/fetch-throttle-base-ms)
               random-ms (config/fetch-throttle-random-ms)
               sleep-duration (+ base-ms (rand-int random-ms))]
-
           (println (str "\t-> Waiting for " sleep-duration "ms..."))
           (Thread/sleep sleep-duration))
+
         (let [html-content (fetch-html-with-retry! driver url)
               output-filename (util/url->filename url)]
-          (pipeline/write-to-next-stage! html-content next-stage-name output-filename))
+          (pipeline/write-to-next-stage! html-content :parser output-filename)
+          (write-meta-file! url output-filename))
+
         (catch Exception e
           (let [ex-data-map (ex-data e)]
             (if (= (:type ex-data-map) :etaoin/http-ex)
@@ -70,14 +80,9 @@
                 (println "\nFATAL ERROR: The connection to the browser appears to be broken.")
                 (println "             Aborting the fetch stage. Please restart the browser and chromedriver.")
                 (println "             Original error:" (.getMessage e))
-                (throw e)) ; Re-throw the exception to halt the doseq loop.
+                (throw e))
               (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e)))))))))
-
   (pipeline/move-to-done! file stage-name))
-
-
-
-
 
 (defn run-stage!
   "Main entry point for the fetch stage. Receives a pre-configured driver."
@@ -91,10 +96,7 @@
           (doseq [file pending-files]
             (process-url-list-file! driver file))
           (catch Exception e
-            ;; If our inner catch block re-threw a fatal exception,
-            ;; catch it here and re-throw it again to abort the pipeline.
             (println "-> Fatal error detected. Propagating to main process to exit.")
-            (throw e)))
-        )
+            (throw e))))
       (println "No url-list files to process.")))
   (println "--- Fetch Stage Complete ---"))

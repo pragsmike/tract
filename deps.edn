@@ -18,7 +18,8 @@
   :discover {:main-opts ["-m" "tract.discovery"]}
   :recover {:main-opts ["-m" "tract.recover"]}
 
-  :convert-fm {:main-opts ["-m" "convert-front-matter"]} ; <--- ADD THIS ALIAS
+  :convert-fm {:main-opts ["-m" "convert-front-matter"]}
+  :backfill-meta {:main-opts ["-m" "backfill-meta"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner

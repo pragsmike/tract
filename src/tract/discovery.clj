@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [net.cgrand.enlive-html :as html]
             [clj-yaml.core :as yaml]
+            [cheshire.core :as json]
             [clojure.set :as set]
             [tract.config :as config]
             [tract.util :as util])
@@ -40,6 +41,7 @@
     (catch MalformedURLException _ true)))
 
 (defn- extract-url-from-md-file [file]
+  ;; This function is now just a fallback helper.
   (try
     (let [content (slurp file)
           front-matter-re #"(?ms)^---\n(.*?)\n---"
@@ -53,6 +55,20 @@
       (println (str "WARN: Could not parse YAML from " (.getName file) ": " (.getMessage e)))
       nil)))
 
+(defn- get-source-url-for-html-file
+  "Finds the source URL for an HTML file in parser/done.
+  Prefers the .meta file, falls back to parsing the corresponding .md file."
+  [html-file]
+  (let [meta-file (io/file (str (.getAbsolutePath html-file) ".meta"))]
+    (if (.exists meta-file)
+      ;; Preferred method: Read from .meta file
+      (:source_url (json/parse-string (slurp meta-file) true))
+      ;; Fallback method for non-backfilled files
+      (let [article-key (-> (.getName html-file) (str/replace #"\.html$" ""))
+            md-file (io/file processed-dir (str article-key ".md"))]
+        (when (.exists md-file)
+          (extract-url-from-md-file md-file))))))
+
 (defn- get-files-from-dir [dir-path extension]
   (let [dir (io/file dir-path)]
     (if (.exists dir)
@@ -64,11 +80,11 @@
   "Scans all relevant directories to build a set of all known URLs."
   []
   (println "-> Building database of known URLs...")
-  (let [processed-md-files (get-files-from-dir processed-dir ".md")
+  (let [html-files-in-parser-done (get-files-from-dir parser-done-dir ".html")
+        processed-urls (doall (map get-source-url-for-html-file html-files-in-parser-done))
         fetch-pending-txt-files (get-files-from-dir fetch-pending-dir ".txt")
         fetch-done-txt-files (get-files-from-dir fetch-done-dir ".txt")
 
-        processed-urls (doall (map extract-url-from-md-file processed-md-files))
         fetch-job-urls (doall (mapcat #(str/split-lines (slurp %))
                                       (concat fetch-pending-txt-files fetch-done-txt-files)))]
 
