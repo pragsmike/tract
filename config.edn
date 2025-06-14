@@ -13,9 +13,9 @@
  ;; Configuration for the main article fetch stage (using etaoin)
  :fetch-stage {
                ;; Base wait time in milliseconds before a fetch
-               :throttle-base-ms 2500
+               :throttle-base-ms 3000
                ;; Random additional wait time (0 to this value)
-               :throttle-random-ms 2000
+               :throttle-random-ms 2500
                ;; Max number of retries for a single URL on 'Too Many Requests' errors
                :max-retries 5
                }

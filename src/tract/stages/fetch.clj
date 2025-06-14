@@ -64,8 +64,20 @@
               output-filename (util/url->filename url)]
           (pipeline/write-to-next-stage! html-content next-stage-name output-filename))
         (catch Exception e
-          (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e)))))))
+          (let [ex-data-map (ex-data e)]
+            (if (= (:type ex-data-map) :etaoin/http-ex)
+              (do
+                (println "\nFATAL ERROR: The connection to the browser appears to be broken.")
+                (println "             Aborting the fetch stage. Please restart the browser and chromedriver.")
+                (println "             Original error:" (.getMessage e))
+                (throw e)) ; Re-throw the exception to halt the doseq loop.
+              (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e)))))))))
+
   (pipeline/move-to-done! file stage-name))
+
+
+
+
 
 (defn run-stage!
   "Main entry point for the fetch stage. Receives a pre-configured driver."
@@ -75,7 +87,14 @@
     (if (seq pending-files)
       (do
         (println "-> Beginning to process" (count pending-files) "url-list file(s) with shared browser session...")
-        (doseq [file pending-files]
-          (process-url-list-file! driver file)))
+        (try
+          (doseq [file pending-files]
+            (process-url-list-file! driver file))
+          (catch Exception e
+            ;; If our inner catch block re-threw a fatal exception,
+            ;; catch it here and re-throw it again to abort the pipeline.
+            (println "-> Fatal error detected. Propagating to main process to exit.")
+            (throw e)))
+        )
       (println "No url-list files to process.")))
   (println "--- Fetch Stage Complete ---"))

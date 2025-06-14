@@ -1,10 +1,9 @@
-;; File: src/tract/core.clj
 (ns tract.core
   (:require [tract.pipeline :as pipeline]
             [tract.stages.job :as job]
             [tract.stages.fetch :as fetch]
             [tract.stages.parser :as parser]
-            [tract.config :as config] ; <--- ADDED
+            [tract.config :as config]
             [etaoin.api :as e]))
 
 (def stages [:job :fetch :parser])
@@ -19,11 +18,9 @@
   (println "--- Initialization Complete ---\n")
 
   (println "-> Connecting to existing Chrome browser on port 9222...")
-  ;; vvvv MODIFIED vvvv
   (let [driver (e/chrome {:capabilities
                           {:chromeOptions
                            {:debuggerAddress (config/browser-debugger-address)}}})]
-  ;; ^^^^ MODIFIED ^^^^
     (try
       (println "-> Successfully connected to browser. Assuming it is already logged in.")
 
@@ -33,8 +30,26 @@
       (println)
       (parser/run-stage!)
 
+      ;; vvvv ADDED CATCH BLOCK TO HANDLE FATAL ERRORS GRACEFULLY vvvv
+      (catch Exception e
+        (println "\nERROR: A fatal, unrecoverable error occurred in a pipeline stage.")
+        (println (str "       Reason: " (.getMessage e)))
+        (println "       Proceeding to shutdown."))
+      ;; ^^^^ ADDED CATCH BLOCK ^^^^
+
+      ;; vvvv CORRECTED finally BLOCK STRUCTURE vvvv
       (finally
         (println "-> Detaching from browser session (leaving browser open).")
-        (e/quit driver)
+        (try
+          (e/quit driver)
+          (println "-> Successfully detached.")
+          (catch Exception e
+            (println (str "WARN: Graceful driver quit failed (likely already disconnected): " (.getMessage e)))
+            (println "-> Forcibly terminating chromedriver process...")
+            (when-let [proc (get-in driver [:process :proc])]
+              (.destroy proc))))
+
+        ;; These are now correctly inside the single finally block.
         (shutdown-agents)
         (println "\n--- Tract Pipeline Run Finished ---")))))
+      ;; ^^^^ CORRECTED finally BLOCK ^^^^
