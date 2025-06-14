@@ -2,10 +2,9 @@
   (:require [tract.pipeline :as pipeline]
             [tract.parser :as parser-logic]
             [tract.compiler :as compiler]
-            [tract.config :as config]
             [tract.io :as io]
-            [clojure.java.io :as jio])
-  (:gen-class)) ; <-- Add :gen-class to make it an AOT-compilable main namespace
+            [tract.config :as config]
+            [clojure.java.io :as jio]))
 
 (def ^:private stage-name :parser)
 (def ^:private output-dir (config/processed-dir-path))
@@ -44,8 +43,3 @@
         (doseq [file pending-files]
           (process-html-file! file)))))
   (println "--- Parser Stage Complete ---"))
-
-;; **FIXED**: Add a -main function to make this namespace directly runnable.
-(defn -main [& args]
-  (run-stage!)
-  (shutdown-agents))

@@ -14,7 +14,6 @@
 
  :aliases
  {:run {:main-opts ["-m" "tract.core"]}
-  :fetch {:main-opts ["-m" "tract.stages.fetch"]}
   :discover {:main-opts ["-m" "tract.discovery"]}
   :recover {:main-opts ["-m" "tract.recover"]}
 

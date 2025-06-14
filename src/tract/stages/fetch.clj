@@ -51,7 +51,7 @@
         meta-content {:source_url url
                       :fetch_timestamp (.toString (java.time.Instant/now))}
         json-content (json/generate-string meta-content {:pretty true})]
-    (pipeline/write-to-next-stage! json-content :parser meta-filename)))
+    (pipeline/write-to-next-stage! json-content next-stage-name meta-filename)))
 
 (defn- process-url-list-file!
   "Processes a single file containing a list of URLs using a persistent driver."
@@ -70,7 +70,7 @@
 
         (let [html-content (fetch-html-with-retry! driver url)
               output-filename (util/url->filename url)]
-          (pipeline/write-to-next-stage! html-content :parser output-filename)
+          (pipeline/write-to-next-stage! html-content next-stage-name output-filename)
           (write-meta-file! url output-filename))
 
         (catch Exception e
