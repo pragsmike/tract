@@ -19,6 +19,7 @@
 
   :convert-fm {:main-opts ["-m" "convert-front-matter"]}
   :backfill-meta {:main-opts ["-m" "backfill-meta"]}
+  :populate-completed-log {:main-opts ["-m" "populate-completed-log"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner

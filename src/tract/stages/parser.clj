@@ -8,6 +8,17 @@
 
 (def ^:private stage-name :parser)
 (def ^:private output-dir (config/processed-dir-path))
+(def ^:private completed-log-file (str (jio/file (config/work-dir) "completed.log")))
+
+(defn- record-completion!
+  "Appends a successfully processed URL to the completion log."
+  [source-url]
+  (when source-url
+    (try
+      (with-open [writer (jio/writer completed-log-file :append true)]
+        (.write writer (str source-url "\n")))
+      (catch Exception e
+        (println (str "WARN: Could not write to " completed-log-file ": " (.getMessage e)))))))
 
 (defn- process-html-file!
   "Processes a single HTML file from the pending directory."
@@ -25,7 +36,10 @@
       (println (str "\t-> Processing " (count images) " images for " (:article_key (:metadata article))))
       (doseq [job images]
         (let [job-with-output-dir (update job :image_path #(jio/file output-path %))]
-          (io/download-image! job-with-output-dir))))
+          (io/download-image! job-with-output-dir)))
+
+      ;; If all steps succeeded, record the completion.
+      (record-completion! (get-in article [:metadata :source_url])))
 
     (pipeline/move-to-done! html-file stage-name)
     (catch Exception e

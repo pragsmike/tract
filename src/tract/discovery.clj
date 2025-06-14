@@ -10,11 +10,10 @@
   (:import [java.io StringReader]
            [java.net URL MalformedURLException]))
 
-(def processed-dir (config/processed-dir-path))
 (def parser-done-dir (config/stage-dir-path :parser "done"))
 (def fetch-pending-dir (config/stage-dir-path :fetch "pending"))
 (def fetch-done-dir (config/stage-dir-path :fetch "done"))
-(def known-urls-db-file (str (io/file (config/work-dir) "known-urls.txt")))
+(def completed-log-file (str (io/file (config/work-dir) "completed.log")))
 (def external-links-db-file (str (io/file (config/work-dir) "external-links.csv")))
 (def ignore-list-file "ignore-list.txt")
 
@@ -30,45 +29,6 @@
            set)
       #{})))
 
-(defn- is-ignored?
-  "Checks if a given URL's host is on the ignore list."
-  [href-str ignore-set]
-  (try
-    (let [host (.getHost (new URL href-str))
-          substack-subdomain (first (str/split host #"\."))]
-      (or (contains? ignore-set host)
-          (contains? ignore-set substack-subdomain)))
-    (catch MalformedURLException _ true)))
-
-(defn- extract-url-from-md-file [file]
-  ;; This function is now just a fallback helper.
-  (try
-    (let [content (slurp file)
-          front-matter-re #"(?ms)^---\n(.*?)\n---"
-          front-matter-str (some-> (re-find front-matter-re content) second)]
-      (when front-matter-str
-        ;; vvvv REPLACED TOML parser with YAML parser vvvv
-        (-> (yaml/parse-string front-matter-str :keywords true)
-            :source_url)))
-    (catch Exception e
-      ;; This warning is now more relevant for malformed YAML
-      (println (str "WARN: Could not parse YAML from " (.getName file) ": " (.getMessage e)))
-      nil)))
-
-(defn- get-source-url-for-html-file
-  "Finds the source URL for an HTML file in parser/done.
-  Prefers the .meta file, falls back to parsing the corresponding .md file."
-  [html-file]
-  (let [meta-file (io/file (str (.getAbsolutePath html-file) ".meta"))]
-    (if (.exists meta-file)
-      ;; Preferred method: Read from .meta file
-      (:source_url (json/parse-string (slurp meta-file) true))
-      ;; Fallback method for non-backfilled files
-      (let [article-key (-> (.getName html-file) (str/replace #"\.html$" ""))
-            md-file (io/file processed-dir (str article-key ".md"))]
-        (when (.exists md-file)
-          (extract-url-from-md-file md-file))))))
-
 (defn- get-files-from-dir [dir-path extension]
   (let [dir (io/file dir-path)]
     (if (.exists dir)
@@ -80,23 +40,29 @@
   "Scans all relevant directories to build a set of all known URLs."
   []
   (println "-> Building database of known URLs...")
-  (let [html-files-in-parser-done (get-files-from-dir parser-done-dir ".html")
-        processed-urls (doall (map get-source-url-for-html-file html-files-in-parser-done))
+  (let [completed-urls (let [file (io/file completed-log-file)]
+                         (if (.exists file)
+                           (->> (slurp file) str/split-lines (remove str/blank?))
+                           []))
         fetch-pending-txt-files (get-files-from-dir fetch-pending-dir ".txt")
         fetch-done-txt-files (get-files-from-dir fetch-done-dir ".txt")
+        in-flight-urls (mapcat #(str/split-lines (slurp %))
+                               (concat fetch-pending-txt-files fetch-done-txt-files))]
 
-        fetch-job-urls (doall (mapcat #(str/split-lines (slurp %))
-                                      (concat fetch-pending-txt-files fetch-done-txt-files)))]
-
-    (->> (concat processed-urls fetch-job-urls)
+    (->> (concat completed-urls in-flight-urls)
          (map util/canonicalize-url) ; Canonicalize all known URLs
          (remove nil?)
          (into #{}))))
 
-(defn- write-known-urls-db! [known-urls]
-  (let [db-file (io/file known-urls-db-file)]
-    (println (str "-> Writing " (count known-urls) " unique URLs to " db-file))
-    (spit db-file (str/join "\n" (sort known-urls)))))
+(defn- is-ignored?
+  "Checks if a given URL's host is on the ignore list."
+  [href-str ignore-set]
+  (try
+    (let [host (.getHost (new URL href-str))
+          substack-subdomain (first (str/split host #"\."))]
+      (or (contains? ignore-set host)
+          (contains? ignore-set substack-subdomain)))
+    (catch MalformedURLException _ true)))
 
 (defn- extract-links-from-html [html-file]
   (let [html-string (slurp html-file)
@@ -149,7 +115,7 @@
   (let [ignore-list (read-ignore-list)
         known-urls (build-known-urls-db)]
     (println (str "-> Loaded " (count ignore-list) " domains to ignore."))
-    (write-known-urls-db! known-urls)
+    (println (str "-> Assembled " (count known-urls) " known URLs from logs and in-flight jobs."))
     (println "\n-> Scanning processed HTML files for new links...")
     (let [html-files (->> (io/file parser-done-dir) file-seq (filter #(.isFile %)))
           unfiltered-links (for [html-file html-files
