@@ -3,7 +3,6 @@
             [clojure.string :as str]
             [net.cgrand.enlive-html :as html]
             [clj-yaml.core :as yaml]
-            [cheshire.core :as json]
             [clojure.set :as set]
             [tract.config :as config]
             [tract.util :as util])
@@ -15,12 +14,34 @@
 (def fetch-done-dir (config/stage-dir-path :fetch "done"))
 (def completed-log-file (str (io/file (config/work-dir) "completed.log")))
 (def external-links-db-file (str (io/file (config/work-dir) "external-links.csv")))
-(def ignore-list-file "ignore-list.txt")
+(def ignored-domains-file "ignored-domains.txt")
+
+;; vvvv CORRECTED HELPER FUNCTION vvvv
+(defn- extract-domain
+  "Safely extracts the host/domain from a URL string."
+  [url-str]
+  (try
+    ;; The threading macro doesn't work with `new`. This is the direct, correct way.
+    (.getHost (new URL (str/trim url-str)))
+    (catch Exception _ nil)))
+;; ^^^^ CORRECTED HELPER FUNCTION ^^^^
+
+(defn- build-known-domains-db
+  "Reads completed.log and returns a set of all domains we have successfully processed."
+  []
+  (let [file (io/file completed-log-file)]
+    (if (.exists file)
+      (->> (slurp file)
+           str/split-lines
+           (map extract-domain)
+           (remove nil?)
+           (into #{}))
+      #{})))
 
 (defn- read-ignore-list
-  "Reads the ignore-list.txt file into a set of hostnames."
+  "Reads the ignored-domains.txt file into a set of hostnames."
   []
-  (let [file (io/file ignore-list-file)]
+  (let [file (io/file ignored-domains-file)]
     (if (.exists file)
       (->> (slurp file)
            str/split-lines
@@ -112,10 +133,19 @@
   "Main entry point for the discovery tool."
   [& args]
   (println "--- Running Discovery Tool ---")
-  (let [ignore-list (read-ignore-list)
-        known-urls (build-known-urls-db)]
+  (let [expand-mode? (some #{"--expand"} args)
+        ignore-list (read-ignore-list)
+        known-urls (build-known-urls-db)
+        known-domains (if-not expand-mode? (build-known-domains-db) #{})]
+
+    (if expand-mode?
+      (println "-> Running in EXPAND mode: will discover articles from new domains.")
+      (println "-> Running in default 'known domains only' mode. Use --expand to discover from new domains."))
     (println (str "-> Loaded " (count ignore-list) " domains to ignore."))
     (println (str "-> Assembled " (count known-urls) " known URLs from logs and in-flight jobs."))
+    (when-not expand-mode?
+      (println (str "-> Restricting discovery to " (count known-domains) " known domains.")))
+
     (println "\n-> Scanning processed HTML files for new links...")
     (let [html-files (->> (io/file parser-done-dir) file-seq (filter #(.isFile %)))
           unfiltered-links (for [html-file html-files
@@ -123,14 +153,19 @@
                                  link (extract-links-from-html html-file)]
                              (assoc link :source_key source-key))
           all-links (remove #(is-ignored? (:href %) ignore-list) unfiltered-links)
-          classified-links (group-by classify-link all-links)]
+          classified-links (group-by classify-link all-links)
+          potential-articles (get classified-links :substack_article [])
+          approved-articles (cond->> potential-articles
+                              (not expand-mode?) (filter #(contains? known-domains (extract-domain (:href %)))))
+          discovered-articles (->> approved-articles
+                                   (map :href)
+                                   (map util/canonicalize-url)
+                                   set)
+          external-links (:external classified-links)
+          new-articles (set/difference discovered-articles known-urls)]
 
-      (let [discovered-articles (->> (:substack_article classified-links)
-                                     (map :href)
-                                     (map util/canonicalize-url)
-                                     set)
-            external-links (:external classified-links)
-            new-articles (set/difference discovered-articles known-urls)]
-        (write-external-links-csv! external-links)
-        (write-job-file! new-articles))))
-  (println "\n--- Discovery Tool Finished ---"))
+      (println (str "-> Found " (count potential-articles) " potential articles, "
+                    (count approved-articles) " approved for consideration."))
+      (write-external-links-csv! external-links)
+      (write-job-file! new-articles)))
+    (println "\n--- Discovery Tool Finished ---"))

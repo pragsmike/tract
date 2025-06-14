@@ -7,4 +7,4 @@
 .lsp
 .cpcache
 work
-ignore-list.txt
+ignored-domains.txt
