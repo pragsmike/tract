@@ -1,0 +1,23 @@
+These are in the project whose top-level URL is https://github.com/pragsmike/tract/tree/main .
+
+https://github.com/pragsmike/tract/blob/main/README.md
+https://github.com/pragsmike/tract/blob/main/USAGE.md
+https://github.com/pragsmike/tract/blob/main/docs/DESIGN.md
+https://github.com/pragsmike/tract/blob/main/docs/DESIGN-discovery.md
+https://github.com/pragsmike/tract/blob/main/docs/DESIGN-prune.md
+
+https://github.com/pragsmike/tract/blob/main/config.edn
+https://github.com/pragsmike/tract/blob/main/deps.edn
+https://github.com/pragsmike/tract/blob/main/Makefile
+https://github.com/pragsmike/tract/blob/main/src/tract/compiler.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/config.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/core.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/discovery.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/io.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/parser.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/pipeline.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/recover.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/util.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/stages/fetch.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/stages/job.clj
+https://github.com/pragsmike/tract/blob/main/src/tract/stages/parser.clj

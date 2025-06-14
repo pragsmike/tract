@@ -1,32 +1,33 @@
+;; File: src/tract/stages/parser.clj
 (ns tract.stages.parser
   (:require [tract.pipeline :as pipeline]
             [tract.parser :as parser-logic]
             [tract.compiler :as compiler]
             [tract.io :as io]
             [tract.config :as config]
-            [clojure.java.io :as jio]))
+            [clojure.java.io :as jio]
+            [tract.db :as db]
+            ;; Add cheshire for reading .meta files
+            [cheshire.core :as json]))
 
 (def ^:private stage-name :parser)
 (def ^:private output-dir (config/processed-dir-path))
-(def ^:private completed-log-file (str (jio/file (config/work-dir) "completed.log")))
-
-(defn- record-completion!
-  "Appends a successfully processed URL to the completion log."
-  [source-url]
-  (when source-url
-    (try
-      (with-open [writer (jio/writer completed-log-file :append true)]
-        (.write writer (str source-url "\n")))
-      (catch Exception e
-        (println (str "WARN: Could not write to " completed-log-file ": " (.getMessage e)))))))
 
 (defn- process-html-file!
   "Processes a single HTML file from the pending directory."
   [html-file]
   (println (str "-> Processing HTML file: " (.getName html-file)))
   (try
-    (let [html-string (slurp html-file)
-          parsed-data (parser-logic/parse-html html-string)
+    (let [;; --- MODIFIED LOGIC: Read .meta file for context ---
+          html-string (slurp html-file)
+          meta-file (jio/file (str (.getAbsolutePath html-file) ".meta"))
+          meta-data (if (.exists meta-file)
+                      (json/parse-string (slurp meta-file) true)
+                      {})
+          source-url (:source_url meta-data)
+          ;; Pass source-url context to the parser
+          parsed-data (parser-logic/parse-html html-string source-url)
+          ;; --- END MODIFIED LOGIC ---
           {:keys [article images]} (compiler/compile-to-article parsed-data)
           output-path (jio/file output-dir)]
       (.mkdirs output-path)
@@ -38,8 +39,13 @@
         (let [job-with-output-dir (update job :image_path #(jio/file output-path %))]
           (io/download-image! job-with-output-dir)))
 
-      ;; If all steps succeeded, record the completion.
-      (record-completion! (get-in article [:metadata :source_url])))
+      ;; --- MODIFIED COMPLETION LOGIC ---
+      ;; Use the real, extracted data instead of placeholders
+      (let [metadata (:metadata article)]
+        (db/record-completion! {:post-id       (:post_id metadata)
+                                :source-url    (:source_url metadata)
+                                :canonical-url (:canonical_url metadata)}))
+      ;; --- END MODIFIED COMPLETION LOGIC ---
 
     (pipeline/move-to-done! html-file stage-name)
     (catch Exception e

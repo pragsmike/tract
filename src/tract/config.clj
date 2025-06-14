@@ -66,3 +66,14 @@
    (str (io/file (work-dir) (name stage-name))))
   ([stage-name subdir-name]
    (str (io/file (work-dir) (name stage-name) (name subdir-name)))))
+
+
+(defn completed-post-ids-log-path
+  "Returns the full path to the log of completed post IDs."
+  []
+  (str (io/file (work-dir) "completed-post-ids.log")))
+
+(defn url-to-id-map-path
+  "Returns the full path to the URL-to-ID lookup map."
+  []
+  (str (io/file (work-dir) "url-to-id.map")))

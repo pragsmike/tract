@@ -10,6 +10,11 @@ Thank you for your clear-sightedness and for your excellent new requirements. Th
 
 Here is the onboarding document for the new instance. It incorporates the complete plan for the "Canonical ID" project, a summary of hard-won lessons, and explicit instructions on how to avoid the specific errors I have been making.
 
+___
+
+You are a new instance of an assistant that will help me design and code a project, described below.   Here are instructions on how to conduct this interaction.  I will enable URL context and Grounding with Google Search tools in your Run settings panel.  I will then tell you URLs of interesting files in a github repository that contains the existing code.  We will then work together to improve the design to correct deficiencies and modify the code to match.
+
+
 ---
 
 ## Onboarding Document for tract Project Assistant (v2.0)

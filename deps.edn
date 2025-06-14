@@ -9,8 +9,7 @@
         org.glassfish.jaxb/jaxb-runtime {:mvn/version "2.3.1"}
         org.clojure/data.xml {:mvn/version "0.2.0-alpha9"}
         clj-commons/clj-yaml {:mvn/version "1.0.29"}
-        io.github.tonsky/toml-clj {:mvn/version "0.1.0"}
-        }
+        io.github.tonsky/toml-clj {:mvn/version "0.1.0"}}
 
  :aliases
  {:run {:main-opts ["-m" "tract.core"]}
@@ -21,6 +20,10 @@
   :backfill-meta {:main-opts ["-m" "backfill-meta"]}
   :populate-completed-log {:main-opts ["-m" "populate-completed-log"]}
   :prune {:main-opts ["-m" "prune-ignored"]}
+  :migrate-log {:main-opts ["-m" "migrate-log"]}
+
+  :dedupe {:main-opts ["-m" "deduplicate-corpus"]}
+
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}}

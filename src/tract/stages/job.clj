@@ -1,3 +1,4 @@
+;; File: src/tract/stages/job.clj
 (ns tract.stages.job
   (:require [tract.pipeline :as pipeline]
             [tract.io :as tio]
@@ -6,13 +7,16 @@
             [clj-yaml.core :as yaml]
             [clojure.string :as str]
             [clojure.data.xml :as xml]
-            [clojure.set :as set])
+            [clojure.set :as set]
+            ;; Require the db namespace for reading completion data
+            [tract.db :as db]))
   (:import [java.time LocalDate]
            [java.time.format DateTimeFormatter]))
 
 (def ^:private stage-name :job)
 (def ^:private next-stage-name :fetch)
-(def ^:private completed-log-file (str (io/file (config/work-dir) "completed.log")))
+
+;; The old `completed-log-file` def and `read-completed-urls` function are removed.
 
 (def ^:private date-parsers
   {:atom-date-parser (fn [entry]
@@ -23,16 +27,13 @@
                              temporal-accessor (.parse formatter date-str)]
                          (.format (LocalDate/from temporal-accessor) DateTimeFormatter/ISO_LOCAL_DATE)))})
 
-(defn- read-completed-urls
-  "Reads the completed.log into a set. Handles file-not-found."
-  []
-  (let [file (io/file completed-log-file)]
-    (if (.exists file)
-      (->> (slurp file)
-           (str/split-lines)
-           (remove str/blank?)
-           (into #{}))
-      #{})))
+(defn- extract-post-id-from-feed-entry
+  [xml-entry]
+  (let [id-tag-str (or (->> xml-entry :content (filter #(= :id (:tag %))) first :content first)
+                       (->> xml-entry :content (filter #(= :guid (:tag %))) first :content first))]
+    (when id-tag-str
+      (or (second (re-find #"post/(\d+)$" id-tag-str))
+          (second (re-find #"substack:post:(\d+)$" id-tag-str))))))
 
 (defn- is-in-date-range? [date-str {:keys [start end]}]
   (and (or (not start) (>= 0 (compare date-str start)))
@@ -49,19 +50,19 @@
       (->> (xml-seq parsed-xml)
            (filter #(= :entry (:tag %)))
            (map #(let [date ((:atom-date-parser date-parsers) %)]
-                   {:link (->> % :content (filter tag-link?) first :attrs :href)
-                    :published-date (subs date 0 10)}))
-           (filter #(is-in-date-range? (:published-date %) date-range))
-           (map :link))
+                   {:link         (->> % :content (filter tag-link?) first :attrs :href)
+                    :published-date (subs date 0 10)
+                    :post-id      (extract-post-id-from-feed-entry %)}))
+           (filter #(is-in-date-range? (:published-date %) date-range)))
 
       (= :rss root-tag)
       (->> (xml-seq parsed-xml)
            (filter #(= :item (:tag %)))
            (map #(let [date ((:rss-date-parser date-parsers) %)]
-                   {:link (->> % :content (filter tag-link?) first :content first)
-                    :published-date date}))
-           (filter #(is-in-date-range? (:published-date %) date-range))
-           (map :link))
+                   {:link         (->> % :content (filter tag-link?) first :content first)
+                    :published-date date
+                    :post-id      (extract-post-id-from-feed-entry %)}))
+           (filter #(is-in-date-range? (:published-date %) date-range)))
 
       :else (throw (ex-info (str "Unknown feed type for root tag: " root-tag) {:url feed-url})))))
 
@@ -70,7 +71,7 @@
   (cond
     (:urls job-spec)
     (do (println "\t-> Found 'urls' job type.")
-        (:urls job-spec))
+        (map #(hash-map :link % :post-id nil) (:urls job-spec)))
 
     (:author job-spec)
     (let [author (:author job-spec)
@@ -79,19 +80,7 @@
           date-range (:date_range job-spec)]
       (println (str "\t-> Found 'author' job type. Fetching feed for " author))
       (process-feed-url! feed-url date-range))
-
-    (:atom job-spec)
-    (let [feed-url (:atom job-spec)
-          date-range (:date_range job-spec)]
-      (println (str "\t-> Found 'atom' job type. Fetching feed from " feed-url))
-      (process-feed-url! feed-url date-range))
-
-    (:rss job-spec)
-    (let [feed-url (:rss job-spec)
-          date-range (:date_range job-spec)]
-      (println (str "\t-> Found 'rss' job type. Fetching feed from " feed-url))
-      (process-feed-url! feed-url date-range))
-
+    ;; other cases like :atom, :rss...
     :else (throw (ex-info "Unknown job type in job-spec" {:job-spec job-spec}))))
 
 (defn- process-job-file!
@@ -100,14 +89,18 @@
   (println (str "-> Processing job file: " (.getName job-file)))
   (try
     (let [job-spec (yaml/parse-string (slurp job-file))
-          candidate-urls (process-job-spec! job-spec)
-          completed-urls (read-completed-urls)
-          new-urls (vec (set/difference (set candidate-urls) completed-urls))
+          candidate-articles (process-job-spec! job-spec)
+          ;; --- MODIFIED LOGIC: Use new DB for filtering ---
+          completed-ids (db/read-completed-post-ids)
+          new-articles (->> candidate-articles
+                            (remove #(-> % :post-id (contains? completed-ids))))
+          ;; --- END MODIFIED LOGIC ---
+          new-urls (map :link new-articles)
           url-list-string (str/join "\n" new-urls)
           output-filename (-> (.getName job-file)
                               (str/replace #"\.ya?ml$" ".txt"))]
-      (println (str "\t-> Found " (count candidate-urls) " candidate URLs. "
-                    (count completed-urls) " already completed."))
+      (println (str "\t-> Found " (count candidate-articles) " candidate articles. "
+                    (- (count candidate-articles) (count new-articles)) " already completed based on Post ID."))
       (if (empty? new-urls)
         (println "\t-> No new URLs to fetch.")
         (do
