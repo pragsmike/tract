@@ -9,7 +9,7 @@
 
 The system is built as a robust, resilient, file-based pipeline, capable of handling both public and authenticated (subscriber-only) content. It is designed to be polite by throttling its network requests and to be extensible for supporting new sources and features in the future.
 
-This document serves as the primary **technical guide** for developers working on `tract`. For a user-focused guide on how to operate the application, please see **[USAGE.md](./USAGE.md)**.
+This document serves as the primary **technical guide** for developers working on `tract`. For a user-focused guide on how to operate the application, please see **[USAGE.md](../USAGE.md)**.
 
 ### Project Design Documents
 

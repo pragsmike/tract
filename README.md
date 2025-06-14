@@ -111,7 +111,7 @@ There are also one-time utility scripts in the `scripts/` directory for migratin
 This README provides a high-level overview. For more detailed information, please see:
 
 -   **[USAGE.md](./USAGE.md): The User Manual.** For a detailed guide on configuration, all command-line options, and managing your corpus.
--   **[DESIGN.md](./DESIGN.md): The Developer's Guide.** For a deep dive into the software architecture, namespace responsibilities, and contribution guidelines.
+-   **[DESIGN.md](./docs/DESIGN.md): The Developer's Guide.** For a deep dive into the software architecture, namespace responsibilities, and contribution guidelines.
 
 ## Limitations and Important Considerations
 

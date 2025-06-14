@@ -1,7 +1,3 @@
-Excellent. Here is the revised design document, incorporating all the suggested changes. It formalizes the simplified, linear pipeline, defines the common transition functions, and clarifies the error handling and filtering logic.
-
----
-
 ### Design Document: `tract` Workflow
 
 Our application, `tract`, will be structured as a multi-stage, file-based pipeline. Each stage is an independent, runnable step that communicates with the next by placing files in designated directories. This architecture enhances testability, robustness, and re-runnability.

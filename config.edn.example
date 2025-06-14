@@ -1,0 +1,51 @@
+;;
+;; `tract` Configuration File (Example)
+;;
+;; Instructions:
+;; 1. Copy this file to `config.edn` in the project's root directory.
+;; 2. Customize the values below as needed for your environment.
+;;
+;; `config.edn` is git-ignored, so your personal settings will not be
+;; committed to version control.
+;;
+
+{
+ ;; --- General Settings ---
+
+ ;; The root directory for all pipeline operations and generated files.
+ :work-dir "work"
+
+
+ ;; --- Browser & Fetching ---
+
+ ;; The address of the pre-launched Chrome browser in remote debugging mode.
+ ;; This must match the port used in the `make chrome` command.
+ :browser-debugger-address "127.0.0.1:9222"
+
+
+ ;; --- Stage-specific Settings ---
+
+ ;; Configuration for the main article fetch stage, which uses the browser.
+ :fetch-stage {
+               ;; Base wait time in milliseconds before each browser-based fetch.
+               :throttle-base-ms 2500
+
+               ;; Random additional wait time (from 0 to this value) to add jitter
+               ;; and make requests appear more human.
+               :throttle-random-ms 2000
+
+               ;; The maximum number of times to retry fetching a single URL if
+               ;; the server returns a "Too Many Requests" error.
+               :max-retries 5
+               }
+
+ ;; Configuration for the simpler, non-browser HTTP client used for fetching
+ ;; RSS/Atom feeds and downloading images.
+ :http-client {
+               ;; Base wait time in milliseconds for feed fetches.
+               :throttle-base-ms 2000
+
+               ;; Random additional wait time for feed fetches.
+               :throttle-random-ms 1500
+               }
+}
