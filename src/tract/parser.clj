@@ -2,7 +2,6 @@
 (ns tract.parser
   (:require [net.cgrand.enlive-html :as html]
             [cheshire.core :as json]
-            [clojure.java.io :as io]
             [clojure.string :as str])
   (:import [java.io StringReader]
            [java.net URL]))

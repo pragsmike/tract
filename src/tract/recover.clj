@@ -4,7 +4,7 @@
             [tract.util :as util]
             [clj-yaml.core :as yaml]
             [net.cgrand.enlive-html :as html])
-  (:import [java.io StringReader File])
+  (:import [java.io StringReader])
   (:gen-class))
 
 (defn- is-short-error-page? [file]

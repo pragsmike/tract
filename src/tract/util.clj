@@ -15,9 +15,10 @@
         first)))
 
 ;; vvvv NEW HELPER FUNCTION TO ENABLE TESTING vvvv
-(defn- current-date-string []
+(defn- current-date-string
   "Returns the current date as an ISO_LOCAL_DATE string.
   Exists as a separate function to be mockable in tests."
+  []
   (.toString (LocalDate/now)))
 ;; ^^^^ NEW HELPER FUNCTION ^^^^
 

@@ -8,15 +8,21 @@
             [clojure.string :as str]
             [net.cgrand.enlive-html :as html]
             [cheshire.core :as json]
-            ;; Add clj-http-lite for HEAD requests
-            [clj-http.lite.client :as client]))
+            [clj-http.lite.client :as client]
+            [clojure.java.io :as io])
   (:import [java.io StringReader]))
 
 (def ^:private stage-name :fetch)
 (def ^:private next-stage-name :parser)
 
-(defn- is-short-error-page?
-  [html-string]
+(defn- delete-recursively! [path-str]
+  (let [file (io/file path-str)]
+    (when (.isDirectory file)
+      (doseq [child (.listFiles file)]
+        (delete-recursively! (.getPath child))))
+    (.delete file)))
+
+(defn- is-short-error-page? [html-string]
   (let [html-len (count html-string)]
     (if (and html-string (> 5000 html-len))
       (try
@@ -27,15 +33,11 @@
       false)))
 
 (defn- exponential-backoff-ms [attempt]
-  (let [base-wait (* (long (Math.pow 2 attempt)) 1000)
+  (let [base-wait (* (long (Math/pow 2 attempt)) 1000)
         random-jitter (rand-int 1500)]
     (+ base-wait random-jitter)))
 
-;; --- NEW PRE-FETCH CHECK LOGIC ---
-
-(defn- get-post-id-from-head-request
-  "Performs a lightweight HEAD request to find the x-substack-post-id header."
-  [url-str]
+(defn- get-post-id-from-head-request [url-str]
   (try
     (let [response (client/head url-str {:throw-exceptions false})
           post-id (get-in response [:headers "x-substack-post-id"])]
@@ -46,9 +48,7 @@
       (println (str "\t-> WARN: HEAD request failed for " url-str ": " (.getMessage e)))
       nil)))
 
-(defn- is-url-already-completed?
-  "The core pre-fetch check. Determines if a URL's article is already completed."
-  [url-str url->id-map completed-ids-set]
+(defn- is-url-already-completed? [url-str url->id-map completed-ids-set]
   (let [post-id (or (get url->id-map url-str)
                     (get-post-id-from-head-request url-str))]
     (if (and post-id (contains? completed-ids-set post-id))
@@ -56,10 +56,8 @@
         (println (str "\t-> Skipping URL for completed Post ID " post-id ": " url-str))
         true)
       false)))
-;; --- END NEW PRE-FETCH CHECK LOGIC ---
 
 (defn- fetch-html-with-retry! [driver url-str]
-  ;; This function remains the same as before
   (loop [attempt 0]
     (if (>= attempt (config/fetch-max-retries))
       (throw (ex-info (str "Failed to fetch " url-str " after " (config/fetch-max-retries) " attempts.")
@@ -75,56 +73,72 @@
               (recur (inc attempt)))
             html-content))))))
 
-(defn- write-meta-file!
-  "Writes a .meta file for a corresponding HTML file."
-  [url output-filename]
-  (let [meta-filename (str output-filename ".meta")
-        meta-content {:source_url url
-                      :fetch_timestamp (.toString (java.time.Instant/now))}
-        json-content (json/generate-string meta-content {:pretty true})]
-    (pipeline/write-to-next-stage! json-content next-stage-name meta-filename)))
+(defn- write-to-tmp-dir! [content filename]
+  (let [tmp-dir (config/fetch-tmp-dir-path)
+        output-file (io/file tmp-dir filename)]
+    (println (str "\t-> Writing temporary file to " output-file))
+    (spit output-file content)))
+
+(defn- move-to-pending! [filename]
+  (let [tmp-dir (config/fetch-tmp-dir-path)
+        next-stage-pending-dir (config/stage-dir-path next-stage-name "pending")
+        source-file (io/file tmp-dir filename)
+        dest-file (io/file next-stage-pending-dir filename)]
+    (println (str "\t-> Moving " filename " to pending directory."))
+    (.renameTo source-file dest-file)))
 
 (defn- process-url-list-file!
-  "Processes a single file containing a list of URLs using a persistent driver."
   [driver file url->id-map completed-ids-set]
   (println (str "-> Processing url-list file: " (.getName file)))
   (let [urls (->> (slurp file)
                   (str/split-lines)
                   (remove str/blank?))]
     (doseq [url urls]
-      ;; --- MODIFIED: Wrap fetch logic in pre-fetch check ---
       (if (is-url-already-completed? url url->id-map completed-ids-set)
         :already-completed
-        (try
-          (let [base-ms (config/fetch-throttle-base-ms)
-                random-ms (config/fetch-throttle-random-ms)
-                sleep-duration (+ base-ms (rand-int random-ms))]
-            (println (str "\t-> Waiting for " sleep-duration "ms..."))
-            (Thread/sleep sleep-duration))
+        (let [output-filename (util/url->filename url)
+              meta-filename (str output-filename ".meta")]
+          (try
+            (let [base-ms (config/fetch-throttle-base-ms)
+                  random-ms (config/fetch-throttle-random-ms)
+                  sleep-duration (+ base-ms (rand-int random-ms))]
+              (println (str "\t-> Waiting for " sleep-duration "ms..."))
+              (Thread/sleep sleep-duration))
 
-          (let [html-content (fetch-html-with-retry! driver url)
-                output-filename (util/url->filename url)]
-            (pipeline/write-to-next-stage! html-content next-stage-name output-filename)
-            (write-meta-file! url output-filename))
+            (let [html-content (fetch-html-with-retry! driver url)
+                  meta-content {:source_url url
+                                :fetch_timestamp (.toString (java.time.Instant/now))}
+                  json-content (json/generate-string meta-content {:pretty true})]
+              (write-to-tmp-dir! html-content output-filename)
+              (write-to-tmp-dir! json-content meta-filename)
+              (move-to-pending! output-filename)
+              (move-to-pending! meta-filename))
 
-          (catch Exception e
-            ;; This error handling for etaoin remains the same
-            (let [ex-data-map (ex-data e)]
-              (if (= (:type ex-data-map) :etaoin/http-ex)
-                (do
-                  (println "\nFATAL ERROR: The connection to the browser appears to be broken.")
-                  (throw e))
-                (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e))))))))))
+            (catch Exception e
+              (let [ex-data-map (ex-data e)]
+                (if (= (:type ex-data-map) :etaoin/http-ex)
+                  (do
+                    (println "\nFATAL ERROR: The connection to the browser appears to be broken.")
+                    (throw e))
+                  (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e))))))
+            (finally
+              ;; This block will always execute, ensuring temp files are removed.
+              (let [tmp-dir (config/fetch-tmp-dir-path)]
+                (.delete (io/file tmp-dir output-filename))
+                (.delete (io/file tmp-dir meta-filename))))))))) ; Correct parenthesis count
   (pipeline/move-to-done! file stage-name))
 
 (defn run-stage!
   "Main entry point for the fetch stage. Receives a pre-configured driver."
   [driver]
   (println "--- Running Fetch Stage ---")
-  (let [pending-files (pipeline/get-pending-files stage-name)]
+  (let [tmp-dir-path (config/fetch-tmp-dir-path)
+        pending-files (pipeline/get-pending-files stage-name)]
+    (println (str "-> Preparing clean temporary directory: " tmp-dir-path))
+    (delete-recursively! tmp-dir-path)
+    (.mkdirs (io/file tmp-dir-path))
     (if (seq pending-files)
       (do
-        ;; --- MODIFIED: Load DBs once per run ---
         (println "-> Loading completion databases for pre-fetch checks...")
         (let [url->id-map (db/read-url-to-id-map)
               completed-ids-set (db/read-completed-post-ids)]

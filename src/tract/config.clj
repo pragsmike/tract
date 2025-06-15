@@ -93,3 +93,9 @@
   "Returns the path to the external links database."
   []
   (str (io/file (work-dir) "external-links.csv")))
+;; Add this function to the end of src/tract/config.clj
+
+(defn fetch-tmp-dir-path
+  "Returns the full path to the fetch stage's temporary directory."
+  []
+  (str (io/file (work-dir) "fetch" "tmp")))

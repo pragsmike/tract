@@ -1,0 +1,19 @@
+Let's explore other ways we might avoid the problem of inconsistency entirely.
+Facts currently:
+  * The fetch stage writes two files (html + metadata) for each article.
+  * The parser stage reads those files to produce a single markdown file.
+  * We still have the original HTML documents, along with metadata about how,
+    where, and when they were fetched, in work/parser/done.
+
+The problem we're seeking to avoid is that errors or other interruptions
+in the process might lead to either HTML or metadata files, or both, being missing or corrupted.
+
+There might be metadata but no HTML, or viceversa.
+The records kept by the fetch and parsing process.
+
+
+observe that all the other documents
+
+Whatever we decide to do, it's acceptable to re-process all the fetched HTML files
+to produce the derived documents (markdown).
+This is feasible because we still have the original HTML documents, along with metadata.

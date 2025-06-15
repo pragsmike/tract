@@ -47,7 +47,7 @@
                                 :canonical-url (:canonical_url metadata)}))
       ;; --- END MODIFIED COMPLETION LOGIC ---
 
-    (pipeline/move-to-done! html-file stage-name)
+      (pipeline/move-to-done! html-file stage-name))
     (catch Exception e
       (pipeline/move-to-error! html-file stage-name e))))
 

@@ -2,14 +2,12 @@
 (ns tract.stages.job
   (:require [tract.pipeline :as pipeline]
             [tract.io :as tio]
-            [clojure.java.io :as io]
             [tract.config :as config]
             [clj-yaml.core :as yaml]
             [clojure.string :as str]
             [clojure.data.xml :as xml]
-            [clojure.set :as set]
             ;; Require the db namespace for reading completion data
-            [tract.db :as db]))
+            [tract.db :as db])
   (:import [java.time LocalDate]
            [java.time.format DateTimeFormatter]))
 
