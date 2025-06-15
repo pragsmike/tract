@@ -1,23 +1,18 @@
+;; File: scripts/prune-ignored.clj
 (ns prune-ignored
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.set :as set]
             [tract.config :as config]
             [tract.util :as util]
-            [clj-yaml.core :as yaml])
-  (:import [java.net URL]) ; <--- THIS LINE WAS MISSING
+            [tract.parser :as parser]
+            [tract.db :as db]
+            [clj-yaml.core :as yaml]
+            [clojure.edn :as edn])
   (:gen-class))
 
-(def ^:private ignored-domains-file "ignored-domains.txt")
-(def ^:private completed-log-file (str (io/file (config/work-dir) "completed.log")))
-(def ^:private processed-dir (config/processed-dir-path))
-(def ^:private parser-done-dir (config/stage-dir-path :parser "done"))
-
-(defn- extract-domain [url-str]
-  (try (.getHost (new URL (str/trim url-str))) (catch Exception _ nil)))
-
 (defn- read-ignored-domains []
-  (let [file (io/file ignored-domains-file)]
+  (let [file (io/file (config/ignored-domains-path))]
     (if (.exists file)
       (->> (slurp file)
            str/split-lines
@@ -26,77 +21,95 @@
            set)
       #{})))
 
-(defn- find-prune-candidates
-  "Scans all processed .md files and returns a list of candidates for pruning.
-  A candidate is a map containing the source_url and a list of all associated file paths."
-  [ignored-domains]
-  (let [md-files (->> (io/file processed-dir)
-                      (.listFiles)
+(defn- find-prune-candidates [ignored-domains]
+  (let [processed-dir (io/file (config/processed-dir-path))
+        parser-done-dir (io/file (config/stage-dir-path :parser "done"))
+        md-files (->> (.listFiles processed-dir)
                       (filter #(str/ends-with? (.getName %) ".md")))]
     (->> md-files
          (map (fn [md-file]
                 (try
-                  (let [content (slurp md-file)
-                        front-matter-re #"(?ms)^---\n(.*?)\n---"
-                        front-matter-str (some-> (re-find front-matter-re content) second)
-                        metadata (when front-matter-str (yaml/parse-string front-matter-str :keywords true))
-                        source-url (:source_url metadata)
-                        domain (extract-domain source-url)]
-                    (when (contains? ignored-domains domain)
-                      {:source_url source-url
-                       :files      [(.getPath md-file)
-                                    (.getPath (io/file parser-done-dir (str (:article_key metadata) ".html")))
-                                    (.getPath (io/file parser-done-dir (str (:article_key metadata) ".html.meta")))]}))
-                  (catch Exception _ nil))))
+                  (let [front-matter (->> (slurp md-file)
+                                          (re-find #"(?ms)^---\n(.*?)\n---")
+                                          second
+                                          (yaml/parse-string :keywords true))
+                        source-url (:source_url front-matter)
+                        domain (util/extract-domain source-url)
+                        html-filename (util/url->filename source-url)
+                        html-file (io/file parser-done-dir html-filename)]
+                    (when (and source-url (contains? ignored-domains domain) (.exists html-file))
+                      (let [parsed-data (parser/parse-html (slurp html-file) source-url)]
+                        {:source-url source-url
+                         :post-id    (get-in parsed-data [:metadata :post_id])
+                         :files      [(.getPath md-file)
+                                      (.getPath html-file)
+                                      (str (.getPath html-file) ".meta")]})))
+                  (catch Exception e nil))))
          (remove nil?))))
 
-(defn- perform-dry-run
-  "Prints the files that would be deleted."
-  [candidates]
+(defn- perform-dry-run [candidates]
   (println "\n--- DRY RUN: The following files would be deleted ---")
   (if (empty? candidates)
     (println "No files from ignored domains found.")
-    (doseq [{:keys [source_url files]} candidates]
-      (println (str "\n[Ignored] " source_url))
+    (doseq [{:keys [source-url files]} candidates] ; Destructuring is safe here
+      (println (str "\n[Ignored] " source-url))
       (doseq [f files]
         (println (str "  - " f))))))
 
-(defn- perform-delete
-  "Deletes the files for the given candidates and updates the completed.log."
-  [candidates]
+(defn- perform-delete! [candidates]
   (println "\n--- FORCE MODE: Deleting files from ignored domains ---")
   (if (empty? candidates)
     (println "No files to delete.")
     (do
-      (let [deleted-urls (atom #{})]
-        (doseq [{:keys [source_url files]} candidates]
-          (println (str "\n[Deleting] " source_url))
-          (doseq [f files]
-            (let [file-obj (io/file f)]
-              (if (.exists file-obj)
-                (if (.delete file-obj)
-                  (println (str "  - [DELETED] " f))
-                  (println (str "  - [FAILED] " f)))
-                (println (str "  - [MISSING] " f)))))
-          (swap! deleted-urls conj source_url))
+      ;; Step 1: Delete the physical files
+      (doseq [{:keys [source-url files]} candidates]
+        (println (str "\n[Deleting] " source-url))
+        (doseq [f files]
+          (let [file-obj (io/file f)]
+            (if (.exists file-obj)
+              (if (.delete file-obj)
+                (println (str "  - [DELETED] " f))
+                (println (str "  - [FAILED] " f)))
+              (println (str "  - [MISSING] " f))))))
 
-        (println "\n-> Updating completed.log...")
-        (let [original-urls (->> (slurp completed-log-file) str/split-lines set)
-              updated-urls (set/difference original-urls @deleted-urls)]
-          (spit completed-log-file (str/join "\n" (sort updated-urls)))
-          (println (str "-> Removed " (count @deleted-urls) " URLs from completed.log.")))))))
+      ;; Step 2: Collect the data needed for updates AFTER the loop
+      (let [condemned-urls (set (map :source-url candidates))
+            condemned-ids  (set (map :post-id candidates))]
 
-(defn -main
-  [& args]
-  (let [force-mode? (some #{"--force" "--delete"} args)
-        ignored-domains (read-ignored-domains)]
-    (println "--- Pruning Utility for Ignored Domains ---")
-    (println (str "-> Loaded " (count ignored-domains) " domains from " ignored-domains-file))
-    (println "-> Scanning for matching files...")
+        (println "\n-> Updating all data files to reflect deletions...")
 
-    (let [candidates (find-prune-candidates ignored-domains)]
-      (if force-mode?
-        (perform-delete candidates)
-        (perform-dry-run candidates)))
+        ;; 2a. Update old completed.log
+        (let [old-log-path (config/old-completed-log-path)
+              original-urls (when (.exists (io/file old-log-path))
+                              (->> (slurp old-log-path) str/split-lines set))
+              updated-urls (set/difference original-urls condemned-urls)]
+          (spit old-log-path (str/join "\n" (sort updated-urls)))
+          (println (str "- Removed " (count condemned-urls) " URLs from legacy completed.log")))
 
+        ;; 2b. Update new completed-post-ids.log
+        (let [ids-log-path (config/completed-post-ids-log-path)
+              original-ids (db/read-completed-post-ids)
+              updated-ids (set/difference original-ids condemned-ids)]
+          (spit ids-log-path (str/join "\n" (sort updated-ids)))
+          (println (str "- Removed " (count condemned-ids) " IDs from completed-post-ids.log")))
+
+        ;; 2c. Update new url-to-id.map
+        (let [map-path (config/url-to-id-map-path)
+              original-map (db/read-url-to-id-map)
+              updated-map (apply dissoc original-map condemned-urls)]
+          (spit map-path (str/join "" (for [[k v] updated-map]
+                                        (str (pr-str {:url k :id v}) "\n"))))
+          (println (str "- Removed " (count condemned-urls) " entries from url-to-id.map")))))))
+
+
+(defn -main [& args]
+  (let [force-mode? (some #{"--force" "--delete"} args)]
+    (println "--- Pruning Utility for Ignored Domains (v4) ---")
+    (let [ignored-domains (read-ignored-domains)]
+      (println (str "-> Loaded " (count ignored-domains) " domains from " (config/ignored-domains-path)))
+      (println "-> Scanning for matching files...")
+      (let [candidates (find-prune-candidates ignored-domains)]
+        (if force-mode?
+          (perform-delete! candidates)
+          (perform-dry-run candidates))))
     (println "\n--- Prune Finished ---")))

@@ -77,3 +77,19 @@
   "Returns the full path to the URL-to-ID lookup map."
   []
   (str (io/file (work-dir) "url-to-id.map")))
+
+(defn old-completed-log-path
+  "Returns the path to the legacy completed.log file.
+  This is for use by migration/pruning tools only."
+  []
+  (str (io/file (work-dir) "completed.log")))
+
+(defn ignored-domains-path
+  "Returns the path to the ignored-domains.txt file in the project root."
+  []
+  "ignored-domains.txt")
+
+(defn external-links-csv-path
+  "Returns the path to the external links database."
+  []
+  (str (io/file (work-dir) "external-links.csv")))

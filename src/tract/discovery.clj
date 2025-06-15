@@ -12,19 +12,10 @@
 (def parser-done-dir (config/stage-dir-path :parser "done"))
 (def fetch-pending-dir (config/stage-dir-path :fetch "pending"))
 (def fetch-done-dir (config/stage-dir-path :fetch "done"))
-(def completed-log-file (str (io/file (config/work-dir) "completed.log")))
-(def external-links-db-file (str (io/file (config/work-dir) "external-links.csv")))
-(def ignored-domains-file "ignored-domains.txt")
+(def completed-log-file (config/old-completed-log-path))
+(def external-links-db-file (config/external-links-csv-path))
+(def ignored-domains-file (config/ignored-domains-path))
 
-;; vvvv CORRECTED HELPER FUNCTION vvvv
-(defn- extract-domain
-  "Safely extracts the host/domain from a URL string."
-  [url-str]
-  (try
-    ;; The threading macro doesn't work with `new`. This is the direct, correct way.
-    (.getHost (new URL (str/trim url-str)))
-    (catch Exception _ nil)))
-;; ^^^^ CORRECTED HELPER FUNCTION ^^^^
 
 (defn- build-known-domains-db
   "Reads completed.log and returns a set of all domains we have successfully processed."
@@ -33,7 +24,7 @@
     (if (.exists file)
       (->> (slurp file)
            str/split-lines
-           (map extract-domain)
+           (map util/extract-domain)
            (remove nil?)
            (into #{}))
       #{})))
@@ -156,7 +147,7 @@
           classified-links (group-by classify-link all-links)
           potential-articles (get classified-links :substack_article [])
           approved-articles (cond->> potential-articles
-                              (not expand-mode?) (filter #(contains? known-domains (extract-domain (:href %)))))
+                              (not expand-mode?) (filter #(contains? known-domains (util/extract-domain (:href %)))))
           discovered-articles (->> approved-articles
                                    (map :href)
                                    (map util/canonicalize-url)

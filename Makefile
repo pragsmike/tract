@@ -13,8 +13,13 @@ backfill-meta:
 	clj -M:backfill-meta
 populate-completed-log:
 	clj -M:populate-completed-log
-prune:
-	clj -M:prune
+
+# Runs the prune utility in safe, dry-run mode.
+prune-ignored:
+	clj -M:prune-ignored
+# Runs the prune utility and PERMANENTLY DELETES ignored files.
+prune-force:
+	clj -M:prune-ignored --force
 migrate-log:
 	clj -M:migrate-log
 

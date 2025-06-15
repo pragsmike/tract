@@ -56,3 +56,6 @@
         (str/replace #"^/p/" "")
         (str/replace #"[^a-zA-Z0-9-]" "_")
         (str ".html"))))
+
+(defn extract-domain [url-str]
+  (try (.getHost (new URL (str/trim url-str))) (catch Exception _ nil)))
