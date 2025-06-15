@@ -3,6 +3,7 @@
 *.bak
 ?
 .clj-kondo
+.nrepl*
 .env
 .lsp
 .cpcache
