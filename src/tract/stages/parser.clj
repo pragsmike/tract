@@ -7,7 +7,6 @@
             [tract.config :as config]
             [clojure.java.io :as jio]
             [tract.db :as db]
-            ;; Add cheshire for reading .meta files
             [cheshire.core :as json]))
 
 (def ^:private stage-name :parser)
@@ -18,36 +17,36 @@
   [html-file]
   (println (str "-> Processing HTML file: " (.getName html-file)))
   (try
-    (let [;; --- MODIFIED LOGIC: Read .meta file for context ---
+    (let [;; --- MODIFIED METADATA LOOKUP LOGIC ---
           html-string (slurp html-file)
-          meta-file (jio/file (str (.getAbsolutePath html-file) ".meta"))
-          meta-data (if (.exists meta-file)
-                      (json/parse-string (slurp meta-file) true)
-                      {})
-          source-url (:source_url meta-data)
-          ;; Pass source-url context to the parser
-          parsed-data (parser-logic/parse-html html-string source-url)
-          ;; --- END MODIFIED LOGIC ---
-          {:keys [article images]} (compiler/compile-to-article parsed-data)
-          output-path (jio/file output-dir)]
-      (.mkdirs output-path)
-      (let [md-file (jio/file output-path (str (:article_key (:metadata article)) ".md"))]
-        (io/write-article! (assoc article :output-file md-file)))
+          html-filename (.getName html-file)
+          ;; Derive the metadata filename and look in the central directory
+          meta-filename (str html-filename ".meta.json")
+          meta-file (jio/file (config/metadata-dir-path) meta-filename)]
 
-      (println (str "\t-> Processing " (count images) " images for " (:article_key (:metadata article))))
-      (doseq [job images]
-        (let [job-with-output-dir (update job :image_path #(jio/file output-path %))]
-          (io/download-image! job-with-output-dir)))
+      (if-not (.exists meta-file)
+        (throw (ex-info (str "Missing metadata file: " meta-filename) {:html-file html-filename}))
+        (let [meta-data (json/parse-string (slurp meta-file) true)
+              source-url (:source_url meta-data)
+              ;; --- END MODIFIED LOGIC ---
+              parsed-data (parser-logic/parse-html html-string source-url)
+              {:keys [article images]} (compiler/compile-to-article parsed-data)
+              output-path (jio/file output-dir)]
+          (.mkdirs output-path)
+          (let [md-file (jio/file output-path (str (:article_key (:metadata article)) ".md"))]
+            (io/write-article! (assoc article :output-file md-file)))
 
-      ;; --- MODIFIED COMPLETION LOGIC ---
-      ;; Use the real, extracted data instead of placeholders
-      (let [metadata (:metadata article)]
-        (db/record-completion! {:post-id       (:post_id metadata)
-                                :source-url    (:source_url metadata)
-                                :canonical-url (:canonical_url metadata)}))
-      ;; --- END MODIFIED COMPLETION LOGIC ---
+          (println (str "\t-> Processing " (count images) " images for " (:article_key (:metadata article))))
+          (doseq [job images]
+            (let [job-with-output-dir (update job :image_path #(jio/file output-path %))]
+              (io/download-image! job-with-output-dir)))
 
-      (pipeline/move-to-done! html-file stage-name))
+          (let [metadata (:metadata article)]
+            (db/record-completion! {:post-id       (:post_id metadata)
+                                    :source-url    (:source_url metadata)
+                                    :canonical-url (:canonical_url metadata)})))))
+
+    (pipeline/move-to-done! html-file stage-name)
     (catch Exception e
       (pipeline/move-to-error! html-file stage-name e))))
 

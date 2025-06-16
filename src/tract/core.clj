@@ -15,6 +15,10 @@
   (doseq [stage-name stages]
     (println (str "Initializing directories for stage: " (name stage-name)))
     (pipeline/initialize-stage-dirs! stage-name))
+
+  (println "Initializing shared directories...")
+  (.mkdirs (io/file (config/metadata-dir-path)))
+
   (println "--- Initialization Complete ---\n")
 
   (println "-> Connecting to existing Chrome browser on port 9222...")

@@ -1,0 +1,92 @@
+Let's explore ways we could improve our handling of metadata.
+Facts currently:
+  * The fetch stage writes two files (html + metadata) for each article.
+  * The parser stage reads those files to produce a single markdown file.
+  * We still have the original HTML documents, along with metadata about how,
+    where, and when they were fetched, in work/parser/done.
+
+The collection of HTML + metadata files is considered a source of truth,
+from which all other data can be derived.
+
+The metadata is stored in a file alongside the HTML, with the same name but with a .meta suffix.
+Here's a sample:
+#+begin_src json
+  {
+  "source_url" : "https://www.thebulwark.com/p/kent-state-and-the-event-horizon-gravity-density-black-holes-june-14-trump-parade-no-kings",
+  "fetch_timestamp" : "backfilled"
+  }
+#+end_src
+
+The fetch metadata is incorporated as front matter in the markdown file derived from the HTML,
+along with other metadata extracted from the HTML.
+This is considered part of the "parser metadata", the other part being the files
+   * url-to-id.map
+   * completed-post-ids.log
+   * external-links.csv
+
+
+#+begin_src yaml
+---
+title: Kent State and the Event Horizon
+author: Jonathan V. Last
+article_key: 2025-06-12_kent-state-and-the-event-horizon
+publication_date: '2025-06-12'
+source_url: https://www.thebulwark.com/p/kent-state-and-the-event-horizon-gravity-density-black-holes-june-14-trump-parade-no-kings
+---
+#+end_src
+
+NOTE: The article slug (our "Post-Id") does not occur as a separate item in the markdown front matter.
+
+The problem we've sought to avoid is that errors or other interruptions
+in the process might lead to either HTML or metadata files, or both, being missing or corrupted.
+The pipeline is designed to indicate workflow state by moving files between directories,
+and originally it just needed to move one file.  That's an atomic operation.
+Having two files that must be moved atomically complicates the logic.
+
+There might be metadata but no HTML, or viceversa.
+
+In the following I will use the word "records" to mean the files created or modified
+by different stages, mainly fetch and parser (or simply "parse") records.
+
+The records kept by the fetch process are the source of truth.
+To recreate them requires re-fetching the articles from the server, which is very expensive.
+Fetch records are fundamentally different from those kept by the parsing process,
+because they can be derived from the fetch records.
+
+I want to consider other ways of storing these records, with at least one exception:
+the HTML files will ALWAYS remain part of our source of truth, and will ALWAYS exist
+in the form of one .html file per article.
+
+We will NOT ever use the creation or modification timestamps of files in our computations.
+They are not reliable indicators of the time the file was fetched, because the files
+may be moved after fetching.
+
+One possiblity is to use a lightweight database to hold records.
+Disadvantages to this include:
+   * special tools must be used to inspect the data for auditing and debugging
+   * tools like grep can't work with the records
+Advantages include:
+   * files don't have to be read in and then written out in their entirety,
+     as must be done when the "database" is actually a file like CSV
+   * operations can get underway faster because they needn't read large files
+     before adding records
+
+Whatever we decide to do, it's acceptable to re-process all the fetched HTML files
+to produce the derived documents (markdown).
+This is feasible because we still have the original HTML documents, along with metadata.
+
+What other approaches can you think of?  What are the pros and cons?
+What risks are there in trying them?
+
+
+---
+
+I'd say that the metadata, even if kept in files, doesn't really need to stay
+with the HTML, and where they happen to be need not correlate with the state of
+the processing. The location of the HTML file can serve that purpose. Avoiding
+databases for now, here's two ideas. 1) have the metadata files be placed in
+another directory where they simply stay, not subject to the pending/done/error
+discipline (this is my favorite non-database idea) 2)what if we simply append
+the metadata as a CSV row to a file that has the slug name (that is also the
+name of the html file) as the first column? That could be used directly by the
+parser stage, or later turned into a database.

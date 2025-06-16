@@ -99,3 +99,8 @@
   "Returns the full path to the fetch stage's temporary directory."
   []
   (str (io/file (work-dir) "fetch" "tmp")))
+
+(defn metadata-dir-path
+  "Returns the full path to the centralized metadata directory."
+  []
+  (str (io/file (work-dir) "metadata")))

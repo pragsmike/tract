@@ -15,12 +15,7 @@
 (def ^:private stage-name :fetch)
 (def ^:private next-stage-name :parser)
 
-(defn- delete-recursively! [path-str]
-  (let [file (io/file path-str)]
-    (when (.isDirectory file)
-      (doseq [child (.listFiles file)]
-        (delete-recursively! (.getPath child))))
-    (.delete file)))
+;; The delete-recursively! function is no longer needed and has been removed.
 
 (defn- is-short-error-page? [html-string]
   (let [html-len (count html-string)]
@@ -73,19 +68,15 @@
               (recur (inc attempt)))
             html-content))))))
 
-(defn- write-to-tmp-dir! [content filename]
-  (let [tmp-dir (config/fetch-tmp-dir-path)
-        output-file (io/file tmp-dir filename)]
-    (println (str "\t-> Writing temporary file to " output-file))
+;; --- NEW METADATA WRITE HELPER ---
+(defn- write-metadata-file!
+  "Writes the metadata to a file in the central metadata directory."
+  [content filename]
+  (let [metadata-dir (config/metadata-dir-path)
+        output-file (io/file metadata-dir filename)]
+    (println (str "\t-> Writing metadata to " output-file))
     (spit output-file content)))
-
-(defn- move-to-pending! [filename]
-  (let [tmp-dir (config/fetch-tmp-dir-path)
-        next-stage-pending-dir (config/stage-dir-path next-stage-name "pending")
-        source-file (io/file tmp-dir filename)
-        dest-file (io/file next-stage-pending-dir filename)]
-    (println (str "\t-> Moving " filename " to pending directory."))
-    (.renameTo source-file dest-file)))
+;; --- END NEW HELPER ---
 
 (defn- process-url-list-file!
   [driver file url->id-map completed-ids-set]
@@ -94,49 +85,41 @@
                   (str/split-lines)
                   (remove str/blank?))]
     (doseq [url urls]
-      (if (is-url-already-completed? url url->id-map completed-ids-set)
-        :already-completed
-        (let [output-filename (util/url->filename url)
-              meta-filename (str output-filename ".meta")]
-          (try
-            (let [base-ms (config/fetch-throttle-base-ms)
-                  random-ms (config/fetch-throttle-random-ms)
-                  sleep-duration (+ base-ms (rand-int random-ms))]
-              (println (str "\t-> Waiting for " sleep-duration "ms..."))
-              (Thread/sleep sleep-duration))
+      (when-not (is-url-already-completed? url url->id-map completed-ids-set)
+        (try
+          (let [base-ms (config/fetch-throttle-base-ms)
+                random-ms (config/fetch-throttle-random-ms)
+                sleep-duration (+ base-ms (rand-int random-ms))]
+            (println (str "\t-> Waiting for " sleep-duration "ms..."))
+            (Thread/sleep sleep-duration))
 
-            (let [html-content (fetch-html-with-retry! driver url)
-                  meta-content {:source_url url
-                                :fetch_timestamp (.toString (java.time.Instant/now))}
-                  json-content (json/generate-string meta-content {:pretty true})]
-              (write-to-tmp-dir! html-content output-filename)
-              (write-to-tmp-dir! json-content meta-filename)
-              (move-to-pending! output-filename)
-              (move-to-pending! meta-filename))
+          (let [html-content (fetch-html-with-retry! driver url)
+                output-filename (util/url->filename url)
+                meta-filename (str output-filename ".meta.json") ; Use a clearer extension
+                meta-content {:source-url url
+                              :fetch-timestamp (.toString (java.time.Instant/now))}
+                json-content (json/generate-string meta-content {:pretty true})]
 
-            (catch Exception e
-              (let [ex-data-map (ex-data e)]
-                (if (= (:type ex-data-map) :etaoin/http-ex)
-                  (do
-                    (println "\nFATAL ERROR: The connection to the browser appears to be broken.")
-                    (throw e))
-                  (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e))))))
-            (finally
-              ;; This block will always execute, ensuring temp files are removed.
-              (let [tmp-dir (config/fetch-tmp-dir-path)]
-                (.delete (io/file tmp-dir output-filename))
-                (.delete (io/file tmp-dir meta-filename))))))))) ; Correct parenthesis count
+            ;; 1. Write the HTML file to the next stage's pending directory.
+            (pipeline/write-to-next-stage! html-content next-stage-name output-filename)
+            ;; 2. Write the metadata to the central metadata directory.
+            (write-metadata-file! json-content meta-filename))
+
+          (catch Exception e
+            (let [ex-data-map (ex-data e)]
+              (if (= (:type ex-data-map) :etaoin/http-ex)
+                (do
+                  (println "\nFATAL ERROR: The connection to the browser appears to be broken.")
+                  (throw e))
+                (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e))))))))))
   (pipeline/move-to-done! file stage-name))
 
 (defn run-stage!
   "Main entry point for the fetch stage. Receives a pre-configured driver."
   [driver]
   (println "--- Running Fetch Stage ---")
-  (let [tmp-dir-path (config/fetch-tmp-dir-path)
-        pending-files (pipeline/get-pending-files stage-name)]
-    (println (str "-> Preparing clean temporary directory: " tmp-dir-path))
-    (delete-recursively! tmp-dir-path)
-    (.mkdirs (io/file tmp-dir-path))
+  (let [pending-files (pipeline/get-pending-files stage-name)]
+    ;; The temporary directory setup is no longer needed here.
     (if (seq pending-files)
       (do
         (println "-> Loading completion databases for pre-fetch checks...")
