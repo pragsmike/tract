@@ -83,11 +83,7 @@
       (let [condemned-urls (set (map :source-url candidates))
             condemned-ids  (set (map :post-id candidates))]
         (println "\n-> Updating all data files to reflect deletions...")
-        (let [old-log-path (config/old-completed-log-path)
-              original-urls (when (.exists (io/file old-log-path)) (->> (slurp old-log-path) str/split-lines set))
-              updated-urls (set/difference original-urls condemned-urls)]
-          (when original-urls (spit old-log-path (str/join "\n" (sort updated-urls))))
-          (println (str "- Removed " (count condemned-urls) " URLs from legacy completed.log")))
+
         (let [ids-log-path (config/completed-post-ids-log-path)
               original-ids (db/read-completed-post-ids)
               updated-ids (set/difference original-ids condemned-ids)]

@@ -78,12 +78,6 @@
   []
   (str (io/file (work-dir) "url-to-id.map")))
 
-(defn old-completed-log-path
-  "Returns the path to the legacy completed.log file.
-  This is for use by migration/pruning tools only."
-  []
-  (str (io/file (work-dir) "completed.log")))
-
 (defn ignored-domains-path
   "Returns the path to the ignored-domains.txt file in the project root."
   []
@@ -93,12 +87,6 @@
   "Returns the path to the external links database."
   []
   (str (io/file (work-dir) "external-links.csv")))
-;; Add this function to the end of src/tract/config.clj
-
-(defn fetch-tmp-dir-path
-  "Returns the full path to the fetch stage's temporary directory."
-  []
-  (str (io/file (work-dir) "fetch" "tmp")))
 
 (defn metadata-dir-path
   "Returns the full path to the centralized metadata directory."
