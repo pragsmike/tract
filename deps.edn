@@ -16,13 +16,7 @@
   :discover {:main-opts ["-m" "tract.discovery"]}
   :recover {:main-opts ["-m" "tract.recover"]}
 
-  :convert-fm {:main-opts ["-m" "convert-front-matter"]}
-  :backfill-meta {:main-opts ["-m" "backfill-meta"]}
-  :populate-completed-log {:main-opts ["-m" "populate-completed-log"]}
   :prune-ignored {:main-opts ["-m" "prune-ignored"]}
-  :migrate-log {:main-opts ["-m" "migrate-log"]}
-
-  :dedupe {:main-opts ["-m" "deduplicate-corpus"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner
