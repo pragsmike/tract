@@ -1,3 +1,4 @@
+;; File: src/tract/discovery.clj
 (ns tract.discovery
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
@@ -5,29 +6,30 @@
             [clj-yaml.core :as yaml]
             [clojure.set :as set]
             [tract.config :as config]
-            [tract.util :as util])
+            [tract.util :as util]
+            ;; Add tract.db to read the new data files
+            [tract.db :as db])
   (:import [java.io StringReader]
            [java.net URL MalformedURLException]))
 
-(def parser-done-dir (config/stage-dir-path :parser "done"))
-(def fetch-pending-dir (config/stage-dir-path :fetch "pending"))
-(def fetch-done-dir (config/stage-dir-path :fetch "done"))
-(def completed-log-file (config/old-completed-log-path))
-(def external-links-db-file (config/external-links-csv-path))
-(def ignored-domains-file (config/ignored-domains-path))
+(def ^:private parser-done-dir (config/stage-dir-path :parser "done"))
+(def ^:private fetch-pending-dir (config/stage-dir-path :fetch "pending"))
+(def ^:private fetch-done-dir (config/stage-dir-path :fetch "done"))
+(def ^:private external-links-db-file (config/external-links-csv-path))
+(def ^:private ignored-domains-file (config/ignored-domains-path))
 
+;; The old completed-log-file def is removed.
 
 (defn- build-known-domains-db
-  "Reads completed.log and returns a set of all domains we have successfully processed."
+  "Reads the url-to-id.map and returns a set of all domains we have successfully processed.
+  This is the modernized version that no longer uses the legacy completed.log."
   []
-  (let [file (io/file completed-log-file)]
-    (if (.exists file)
-      (->> (slurp file)
-           str/split-lines
-           (map util/extract-domain)
-           (remove nil?)
-           (into #{}))
-      #{})))
+  (let [url-map (db/read-url-to-id-map)
+        urls (keys url-map)]
+    (->> urls
+         (map util/extract-domain)
+         (remove nil?)
+         (into #{}))))
 
 (defn- read-ignore-list
   "Reads the ignored-domains.txt file into a set of hostnames."
@@ -49,26 +51,23 @@
       [])))
 
 (defn- build-known-urls-db
-  "Scans all relevant directories to build a set of all known URLs."
+  "Scans all relevant sources to build a set of all known URLs.
+  This now primarily uses the fast url-to-id.map and augments it
+  with in-flight URLs from the pipeline."
   []
-  (println "-> Building database of known URLs...")
-  (let [completed-urls (let [file (io/file completed-log-file)]
-                         (if (.exists file)
-                           (->> (slurp file) str/split-lines (remove str/blank?))
-                           []))
+  (println "-> Building database of known URLs from new data model...")
+  (let [known-urls-from-map (-> (db/read-url-to-id-map) keys set)
         fetch-pending-txt-files (get-files-from-dir fetch-pending-dir ".txt")
         fetch-done-txt-files (get-files-from-dir fetch-done-dir ".txt")
         in-flight-urls (mapcat #(str/split-lines (slurp %))
                                (concat fetch-pending-txt-files fetch-done-txt-files))]
 
-    (->> (concat completed-urls in-flight-urls)
+    (->> (concat known-urls-from-map in-flight-urls)
          (map util/canonicalize-url) ; Canonicalize all known URLs
          (remove nil?)
          (into #{}))))
 
-(defn- is-ignored?
-  "Checks if a given URL's host is on the ignore list."
-  [href-str ignore-set]
+(defn- is-ignored? [href-str ignore-set]
   (try
     (let [host (.getHost (new URL href-str))
           substack-subdomain (first (str/split host #"\."))]
@@ -84,8 +83,7 @@
                  (when href {:href href, :text (str/trim (html/text %))})))
          (remove nil?))))
 
-(defn- classify-link
-  [{:keys [href]}]
+(defn- classify-link [{:keys [href]}]
   (try
     (let [url (new URL (str/trim href))
           host (.getHost url)

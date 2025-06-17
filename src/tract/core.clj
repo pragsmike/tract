@@ -4,7 +4,8 @@
             [tract.stages.fetch :as fetch]
             [tract.stages.parser :as parser]
             [tract.config :as config]
-            [etaoin.api :as e]))
+            [etaoin.api :as e]
+            [clojure.java.io :as io]))
 
 (def stages [:job :fetch :parser])
 
