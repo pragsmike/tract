@@ -21,10 +21,10 @@
 
       ;; 2. Append the URL-to-ID mappings to the lookup map
       (with-open [writer (io/writer (config/url-to-id-map-path) :append true)]
-        ;; Write the source_url -> post_id mapping
+        ;; Write the source-url -> post-id mapping
         (when source-url
           (.write writer (str (pr-str {:url source-url :id post-id}) "\n")))
-        ;; Write the canonical_url -> post_id mapping
+        ;; Write the canonical-url -> post-id mapping
         (when canonical-url
           (.write writer (str (pr-str {:url canonical-url :id post-id}) "\n"))))
       (catch Exception e

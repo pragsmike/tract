@@ -17,8 +17,7 @@
   [html-file]
   (println (str "-> Processing HTML file: " (.getName html-file)))
   (try
-    (let [;; --- MODIFIED METADATA LOOKUP LOGIC ---
-          html-string (slurp html-file)
+    (let [html-string (slurp html-file)
           html-filename (.getName html-file)
           ;; Derive the metadata filename and look in the central directory
           meta-filename (str html-filename ".meta.json")
@@ -27,8 +26,7 @@
       (if-not (.exists meta-file)
         (throw (ex-info (str "Missing metadata file: " meta-filename) {:html-file html-filename}))
         (let [meta-data (json/parse-string (slurp meta-file) true)
-              source-url (:source_url meta-data)
-              ;; --- END MODIFIED LOGIC ---
+              source-url (:source-url meta-data)
               parsed-data (parser-logic/parse-html html-string source-url)
               {:keys [article images]} (compiler/compile-to-article parsed-data)
               output-path (jio/file output-dir)]
@@ -42,9 +40,9 @@
               (io/download-image! job-with-output-dir)))
 
           (let [metadata (:metadata article)]
-            (db/record-completion! {:post-id       (:post_id metadata)
-                                    :source-url    (:source_url metadata)
-                                    :canonical-url (:canonical_url metadata)})))))
+            (db/record-completion! {:post-id       (:post-id metadata)
+                                    :source-url    (:source-url metadata)
+                                    :canonical-url (:canonical-url metadata)})))))
 
     (pipeline/move-to-done! html-file stage-name)
     (catch Exception e
