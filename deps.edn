@@ -17,6 +17,7 @@
   :recover {:main-opts ["-m" "tract.recover"]}
 
   :prune-ignored {:main-opts ["-m" "prune-ignored"]}
+  :recover-url-map {:main-opts ["-m" "recover-url-map"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner
