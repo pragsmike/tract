@@ -7,7 +7,6 @@
             [clojure.set :as set]
             [tract.config :as config]
             [tract.util :as util]
-            ;; Add tract.db to read the new data files
             [tract.db :as db])
   (:import [java.io StringReader]
            [java.net URL MalformedURLException]))
@@ -16,7 +15,6 @@
 (def ^:private fetch-pending-dir (config/stage-dir-path :fetch "pending"))
 (def ^:private fetch-done-dir (config/stage-dir-path :fetch "done"))
 (def ^:private external-links-db-file (config/external-links-csv-path))
-(def ^:private ignored-domains-file (config/ignored-domains-path))
 
 ;; The old completed-log-file def is removed.
 
@@ -30,18 +28,6 @@
          (map util/extract-domain)
          (remove nil?)
          (into #{}))))
-
-(defn- read-ignore-list
-  "Reads the ignored-domains.txt file into a set of hostnames."
-  []
-  (let [file (io/file ignored-domains-file)]
-    (if (.exists file)
-      (->> (slurp file)
-           str/split-lines
-           (remove #(or (str/blank? %) (str/starts-with? % "#")))
-           (map str/trim)
-           set)
-      #{})))
 
 (defn- get-files-from-dir [dir-path extension]
   (let [dir (io/file dir-path)]
@@ -123,7 +109,7 @@
   [& args]
   (println "--- Running Discovery Tool ---")
   (let [expand-mode? (some #{"--expand"} args)
-        ignore-list (read-ignore-list)
+        ignore-list (db/read-ignore-list)
         known-urls (build-known-urls-db)
         known-domains (if-not expand-mode? (build-known-domains-db) #{})]
 

@@ -5,6 +5,8 @@
             [clojure.edn :as edn]
             [clojure.string :as str]))
 
+(def ^:private ignored-domains-file (config/ignored-domains-path))
+
 (defn record-completion!
   "Records a completed article's identity in the new data model.
   - Appends the Post ID to completed-post-ids.log.
@@ -58,3 +60,16 @@
           (println (str "WARN: Could not read or parse url-to-id.map: " (.getMessage e)))
           {}))
       {})))
+
+(defn read-ignore-list
+  "Reads the ignored-domains.txt file into a set of hostnames."
+  []
+  (let [file (io/file ignored-domains-file)]
+    (if (.exists file)
+      (->> (slurp file)
+           str/split-lines
+           (remove #(or (str/blank? %) (str/starts-with? % "#")))
+           (map str/trim)
+           set)
+      #{})))
+

@@ -14,13 +14,11 @@
         (str/split #"\?" 2)
         first)))
 
-;; vvvv NEW HELPER FUNCTION TO ENABLE TESTING vvvv
 (defn- current-date-string
   "Returns the current date as an ISO_LOCAL_DATE string.
   Exists as a separate function to be mockable in tests."
   []
   (.toString (LocalDate/now)))
-;; ^^^^ NEW HELPER FUNCTION ^^^^
 
 (defn generate-article-key
   "Generates a unique file-safe key from article metadata."

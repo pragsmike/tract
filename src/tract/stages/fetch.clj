@@ -63,13 +63,12 @@
     (spit output-file content)))
 
 (defn- process-url-list-file!
-  [driver file url->id-map completed-ids-set]
+  [driver file url->id-map completed-ids-set ignored-domains-set]
   (println (str "-> Processing url-list file: " (.getName file)))
   (let [urls (->> (slurp file)
                   (str/split-lines)
                   (remove str/blank?))]
     (doseq [url urls]
-      ;; --- NEW, CORRECT PRE-FETCH LOGIC ---
       (let [expected-filename (util/url->filename url)
             pending-file (io/file (config/stage-dir-path next-stage-name "pending") expected-filename)]
         (cond
@@ -78,6 +77,9 @@
 
           (is-url-already-completed-in-db? url url->id-map completed-ids-set)
           :already-completed
+
+          (contains? ignored-domains-set (.getHost (java.net.URL. url)))
+          :ignored-domain
 
           :else
           (try
@@ -113,11 +115,12 @@
       (do
         (println "-> Loading completion databases for pre-fetch checks...")
         (let [url->id-map (db/read-url-to-id-map)
-              completed-ids-set (db/read-completed-post-ids)]
+              completed-ids-set (db/read-completed-post-ids)
+              ignored-domains-set (db/read-ignore-list)]
           (println "-> Beginning to process" (count pending-files) "url-list file(s) with shared browser session...")
           (try
             (doseq [file pending-files]
-              (process-url-list-file! driver file url->id-map completed-ids-set))
+              (process-url-list-file! driver file url->id-map completed-ids-set ignored-domains-set))
             (catch Exception e
               (println "-> Fatal error detected. Propagating to main process to exit.")
               (throw e)))))
