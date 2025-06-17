@@ -18,6 +18,7 @@
 
   :prune-ignored {:main-opts ["-m" "prune-ignored"]}
   :recover-url-map {:main-opts ["-m" "recover-url-map"]}
+  :recover-md {:main-opts ["-m" "recover-md-front-matter"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner

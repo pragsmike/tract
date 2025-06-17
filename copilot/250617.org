@@ -1,0 +1,44 @@
+I find corrupted markdown files.
+Some have only the YAML metadata, with nothing after that.
+Some have metadata fields whose value is "unknown".
+Some have error messages, like 502 Bad Gateway.
+Here's an example of one that has both of those last two problems:
+
+#+begin_src text
+---
+title: 502 Bad Gateway
+author: unknown
+article_key: 2025-06-12_502-bad-gateway
+publication_date: unknown
+source_url: unknown
+---
+# 502 Bad Gateway
+#+end_src
+
+Other markdown files contain large chunks (>50kB)  of HTML.
+Here's a sample of the first lines of one of them:
+#+begin_src text
+---
+title: Persuasion | Yascha Mounk | Substack
+author: Yascha Mounk
+article_key: 2025-06-17_persuasion-yascha-mounk-substack
+publication_date: unknown
+source_url: unknown
+---
+
+[](/)
+# [](/)
+Subscribe[Home](/)[Yascha Mounk](/s/yascha-mounk)[American Purpose](/s/american-purpose)[Frankly Fukuyama](/s/frankly-fukuyama)[Bookstack](/s/bookstack)[The Good Fight](https://www.persuasion.com
+munity/podcast)[About](/about)
+## Page not found
+#+end_src
+
+
+
+
+Markdown files less than 300 bytes long are junk.
+They are either missing a body (only metadata) or have useless content
+(eg a single line of "Subscribe for more" or similar content-free message).
+However, some of these very short files do have a valid source_url in their metadata.
+Some of these turn out to be pages that have an embedded video but no textual body.
+These we will ignore for now.
