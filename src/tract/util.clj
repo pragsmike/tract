@@ -1,8 +1,7 @@
 (ns tract.util
   (:require [clojure.string :as str])
   (:import [java.net URL URLDecoder]
-           [java.io File]
-           [java.time LocalDate]))
+           [java.io File]))
 
 (defn canonicalize-url
   "Removes query parameters and fragments from a URL string."
@@ -14,23 +13,8 @@
         (str/split #"\?" 2)
         first)))
 
-(defn- current-date-string
-  "Returns the current date as an ISO_LOCAL_DATE string.
-  Exists as a separate function to be mockable in tests."
-  []
-  (.toString (LocalDate/now)))
-
-(defn generate-article-key
-  "Generates a unique file-safe key from article metadata."
-  [{:keys [publication_date title]}]
-  ;; vvvv MODIFIED TO USE THE NEW HELPER vvvv
-  (let [date-part (or publication_date (current-date-string))
-        full-slug (-> (str/lower-case (or title "untitled"))
-                      (str/replace #"[^a-z0-9\s-]" "")
-                      (str/replace #"\s+" "-"))
-        slug (subs full-slug 0 (min (count full-slug) 50))]
-    (str date-part "_" slug)))
-  ;; ^^^^ MODIFIED ^^^^
+;; REMOVED: The `current-date-string` and `generate-article-key` functions
+;; are no longer needed as the markdown filename is now based on the slug.
 
 (defn url->local-path
   "Converts a potentially complex image URL into a clean local file path string."

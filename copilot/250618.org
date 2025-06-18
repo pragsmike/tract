@@ -1,0 +1,19 @@
+The given URL is the one specified in the job, supplied by the user.
+The canonical URL is the one parsed from the link in the downloaded HTML.
+The slug is the human-friendly name which is the "filename" part of the URL.
+
+NOTE: We assume that the given URL and the canonical URL will NOT have different filename parts.
+They will differ only in hostname, protocol, port, and possibly directory prefix.
+
+Therfore, either the given URL or the canonical one can be used to derive the slug.
+Because it's expensive to parse the HTML, we don't do that just to learn the canonical URL
+unless we don't already know the URL.  This can happen if we find an orphaned HTML file
+and we don't have a record of the URL it came from, eg if its metadata file is missing
+and the database has no record of it.
+
+We are already assuming that the slug is unique.  Do we check, when fetching an article,
+whether there already is an article with that slug in the corpus?
+
+Why do we need to prepend the date to the slug in the markdown filename?
+If the slug is really unique, the date is superfluous and complicates
+our processing logic. Let's leave it for now, to focus on other things.

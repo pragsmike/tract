@@ -25,23 +25,26 @@
 (defn download-image!
   "Downloads an image and writes its metadata JSON file."
   [image-job]
-  (let [local-img-file (:image_path image-job)
+  ;; CORRECTED: Use kebab-case keys to access the image-job map.
+  (let [local-img-file (:image-path image-job)
         img-dir (.getParentFile local-img-file)]
     (try
       ;; This function fetches many small files, so we use a shorter throttle.
       ;; The main article fetch has its own, longer throttle.
       (Thread/sleep 50)
-      (println (str "\t-> Downloading " (:image_source_url image-job)))
+      (println (str "\t-> Downloading " (:image-source-url image-job)))
       (.mkdirs img-dir)
       (with-open [out-stream (io/output-stream local-img-file)]
-        (let [response (client/get (:image_source_url image-job) {:as :stream})]
+        (let [response (client/get (:image-source-url image-job) {:as :stream})]
           (io/copy (:body response) out-stream)))
 
-      (let [json-filename (str (:article_key image-job) "_" (hash image-job) ".json")
+      (let [json-filename (str (:article-key image-job) "_" (hash image-job) ".json")
             json-file (io/file img-dir json-filename)
-            serializable-job (update image-job :image_path str)
+            ;; The :image-path key holds a File object, which is not serializable.
+            ;; Convert it to a string for the JSON output.
+            serializable-job (update image-job :image-path str)
             json-data (json/generate-string serializable-job {:pretty true})]
         (println (str "\t-> Writing metadata to " json-file))
         (spit json-file json-data))
       (catch Exception e
-        (println (str "ERROR: Failed to download " (:image_source_url image-job) ": " (.getMessage e)))))))
+        (println (str "ERROR: Failed to download " (:image-source-url image-job) ": " (.getMessage e)))))))

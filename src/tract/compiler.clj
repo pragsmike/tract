@@ -14,12 +14,13 @@
     (if-not img-src
       {:markdown "" :images []}
       (let [local-path (util/url->local-path img-src)
-            image-job {:article_key article-key
-                       :image_source_url img-src
-                       :image_path local-path
-                       :alt alt-text
-                       :title title-text
-                       :caption caption}]
+            ;; CORRECTED to kebab-case keys
+            image-job {:article-key      article-key
+                       :image-source-url img-src
+                       :image-path       local-path
+                       :alt              alt-text
+                       :title            title-text
+                       :caption          caption}]
         {:markdown (str "\n" (format "![%s](%s \"%s\")" (or (not-empty alt-text) caption) local-path title-text) "\n"
                         (when (not-empty caption) (str "*" caption "*\n")))
          :images [image-job]}))))
@@ -57,9 +58,9 @@
 (defn- format-yaml-front-matter
   "Takes a metadata map and returns a YAML front matter string."
   [metadata]
-  (let [;; Select and order the keys for consistent output.
-        ;; :keywordize-keys false is important for clean YAML output.
-        front-matter-data (select-keys metadata [:title :author :article_key :publication_date :source_url])
+  (let [;; CORRECTED: Select and order kebab-case keys for consistent output.
+        ;; ADDED :post-id to the list of keys to write.
+        front-matter-data (select-keys metadata [:title :author :publication-date :source-url :post-id :article-key])
         yaml-string (yaml/generate-string front-matter-data
                                           :dumper-options {:flow-style :block})]
     (str "---\n"
@@ -70,21 +71,18 @@
 (defn compile-to-article
   "Takes parsed data and returns a map of final article data and image jobs."
   [{:keys [metadata body-nodes]}]
-  (let [article-key (cond
-                      (not (str/blank? (:title metadata)))
-                      (util/generate-article-key metadata)
+  ;; REFACTORED: The article-key is now the canonical slug (:post-id).
+  (let [article-key (let [slug (:post-id metadata)]
+                      (if (str/blank? slug)
+                        (str "unknown-article_" (System/currentTimeMillis))
+                        slug))
 
-                      (not (str/blank? (:source_url metadata)))
-                      (-> (:source_url metadata) util/url->filename (str/replace #"\.html$" ""))
-
-                      :else
-                      (str "unknown-article_" (System/currentTimeMillis)))
-
+        ;; CORRECTED: Use kebab-case keys for all metadata access and creation.
         full-metadata (assoc metadata
                              :title (or (:title metadata) "Untitled")
-                             :publication_date (or (:publication_date metadata) "unknown")
-                             :source_url (or (:source_url metadata) "unknown")
-                             :article_key article-key)
+                             :publication-date (or (:publication-date metadata) "unknown")
+                             :source-url (or (:source-url metadata) "unknown")
+                             :article-key article-key)
         {:keys [markdown images]} (process-node {:tag :div :content body-nodes} article-key)
         final-markdown (-> markdown
                            (str/replace #"(?m)^\s*$\n" "")
@@ -93,4 +91,3 @@
     {:article {:metadata full-metadata
                :markdown (str front-matter final-markdown)}
      :images images}))
-

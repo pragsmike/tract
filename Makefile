@@ -23,6 +23,9 @@ recover-url-map:
 recover-md:
 	clj -M:recover-md
 
+migrate-filenames:
+	clj -M:migrate-filenames
+
 verify-corpus:
 	clj -M:verify-corpus
 repair-filenames:
@@ -46,4 +49,4 @@ pack:
 	   do echo $$i; cat $$i; echo ---- ; done ;\
 	echo Source files; echo -----; \
 	cat src/tract/*.clj src/tract/stages/*.clj scripts/*.clj ) >~/tract-pack
-         
+

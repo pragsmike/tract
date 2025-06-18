@@ -23,6 +23,9 @@
   :repair-filenames {:main-opts ["-m" "repair-filenames"]}
   :repair-conflicts {:main-opts ["-m" "repair-conflicts"]}
   :repair-corpus {:main-opts ["-m" "repair-corpus"]}
+
+  :migrate-filenames {:main-opts ["-m" "migrate-filenames"]}
+
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
