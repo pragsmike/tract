@@ -37,10 +37,10 @@
   (let [parser-done-dir (config/stage-dir-path :parser "done")
         metadata-dir (config/metadata-dir-path)
         quarantine-dir (io/file (config/work-dir) "quarantine")
-        
+
         has-html? (contains? (:html-slugs state) slug)
         has-meta? (contains? (:meta-slugs state) slug)
-        
+
         html-file (io/file parser-done-dir (str slug ".html"))
         meta-file (io/file metadata-dir (str slug ".html.meta.json"))]
 
