@@ -34,11 +34,39 @@ munity/podcast)[About](/about)
 #+end_src
 
 
-
-
 Markdown files less than 300 bytes long are junk.
 They are either missing a body (only metadata) or have useless content
 (eg a single line of "Subscribe for more" or similar content-free message).
 However, some of these very short files do have a valid source_url in their metadata.
 Some of these turn out to be pages that have an embedded video but no textual body.
 These we will ignore for now.
+
+I think prune-ignored might not remove HTML files that it should,
+because their url-to-id and completed-ids entries have been deleted.
+
+I want to proceed in two steps.  First, create a script that will verify
+the validity of the source-of-truth files: the HTML and the metadata files.
+It should print counts of mismatched files and list them, first the orphaned
+metadata files and then the orphaned HTML files.
+   * HTML files should not be less than 300 bytes
+   * metadata files should be parsable and have a matching HTML file.
+   * Each HTML file should have a matching metadata file.
+
+The second step is to build a repair script, possibly as an option to the first script,
+to correct any problems found in that first step.
+   * If there is no metadata for a given HTML file, create one by deducing the
+     URL from which it was fetched.  This may require reading the HTML file
+     to parse its meta tags, one of which has the canonical URL.
+   * If there is no HTML file for a given metadata file, then if the metadata file
+     has a source-url, create a job that will fetch that URL.
+
+Note that we try not to delete already-fetched HTML files, unless they are found to be corrupt.
+In those cases, we try to deduce the URL from which they were fetched, if possible.
+The name of the HTML file, the meta tags such as author, canonical URL, and possibly others
+can help in deducing the URL or at least the Substack publication it came from.
+
+Recall that a source of major bugs has been your failure to use kebab case instead of snake case
+in the metadata files, so be extra careful to use kebab case.
+
+What other inconsistencies in the source-of-truth files might arise, and how
+might they be corrected?  Let's discuss further before generating code.

@@ -23,5 +23,19 @@ recover-url-map:
 recover-md:
 	clj -M:recover-md
 
+verify-corpus:
+	clj -M:verify-corpus
+repair-filenames:
+	clj -M:repair-filenames
+repair-conflicts:
+	clj -M:repair-conflicts
+# Runs the corpus repair tool in safe, dry-run mode
+repair-corpus:
+	clj -M:repair-corpus
+
+# Runs the corpus repair tool and executes all repairs
+repair-corpus-force:
+	clj -M:repair-corpus --force
+
 chrome:
 	google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-data &
