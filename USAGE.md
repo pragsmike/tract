@@ -1,100 +1,88 @@
+Of course. A clear, comprehensive `USAGE.md` is essential for making the project accessible to its intended users. This document is written for an end user whose goal is to use the application, not necessarily to understand its internal workings.
+
+Here is a complete `USAGE.md` file that reflects the current, robust state of the `tract` application.
+
+---
+
 # `tract` User Manual
 
-This document is the primary user guide for operating the `tract` application. It covers configuration, the standard operational workflow, command-line tools, and how to manage your growing content corpus.
+This document is the primary user guide for operating the `tract` application. It covers setup, configuration, the standard operational workflow, and how to manage your growing content corpus.
 
-For a high-level overview of the project or information on software architecture, please see the [README.md](./README.md) or [DESIGN.md](./DESIGN.md) respectively.
+For a high-level overview of the project's philosophy or a deep dive into its software architecture, please see the [README.md](./README.md) or [DESIGN.md](./docs/DESIGN.md) respectively.
 
 ## Table of Contents
-- [Configuration (`config.edn`)](#configuration-configedn)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation & Configuration](#installation--configuration)
+  - [One-Time Browser Authentication](#one-time-browser-authentication)
 - [The Core Workflow: A Step-by-Step Guide](#the-core-workflow-a-step-by-step-guide)
 - [Command Reference](#command-reference)
   - [Primary Makefile Commands](#primary-makefile-commands)
-  - [Advanced CLI Commands & Flags](#advanced-cli-commands--flags)
-  - [Utility & Migration Scripts](#utility--migration-scripts)
-- [The `work/` Directory: A File System Map](#the-work-directory-a-file-system-map)
+  - [Advanced CLI Flags](#advanced-cli-flags)
 - [Corpus Management](#corpus-management)
+  - [Adding New Authors](#adding-new-authors)
+  - [Ignoring Domains](#ignoring-domains)
+  - [Pruning Existing Data](#pruning-existing-data)
+- [The `work/` Directory: Understanding the Filesystem](#the-work-directory-understanding-the-filesystem)
+- [A Note on Responsible Use](#a-note-on-responsible-use)
 
-## Configuration (`config.edn`)
+## Getting Started
 
-All `tract` behavior is controlled by the `config.edn` file in the project's root directory. When setting up the project, it's recommended to copy the `config.edn.example` to `config.edn` and modify it as needed.
+### Prerequisites
+-   **Java Development Kit (JDK):** Version 11 or higher.
+-   **Clojure CLI:** Follow the official instructions at [clojure.org](https://clojure.org/guides/getting_started).
+-   **Google Chrome:** The browser application must be installed.
 
-Below is a breakdown of all available configuration keys.
+### Installation & Configuration
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-repo/tract.git
+    cd tract
+    ```
+2.  **Create your configuration:**
+    ```bash
+    cp config.edn.example config.edn
+    ```
+    Now, open `config.edn` and review the settings. The default values are sensible, but you can customize them if needed.
 
-```edn
-{
- ;; --- General Settings ---
- ;; The root directory for all pipeline operations.
- :work-dir "work"
+### One-Time Browser Authentication
+`tract` uses a live browser session that you control to fetch content. This allows it to access subscriber-only articles and appear as a regular user.
 
- ;; --- Browser & Fetching ---
- ;; The address of the pre-launched Chrome browser in remote debugging mode.
- ;; This must match the port used in the `make chrome` command.
- :browser-debugger-address "127.0.0.1:9222"
-
- ;; --- Stage-specific Settings ---
-
- ;; Configuration for the main article fetch stage (using the browser)
- :fetch-stage {
-               ;; Base wait time in milliseconds before each fetch.
-               :throttle-base-ms 2500
-               ;; Random additional wait time (0 to this value).
-               :throttle-random-ms 2000
-               ;; Max number of retries for a single URL if the server
-               ;; returns a "Too Many Requests" error.
-               :max-retries 5
-               }
-
- ;; Configuration for simple HTTP requests (feeds, images)
- :http-client {
-               ;; Base wait time for feed fetches.
-               :throttle-base-ms 2000
-               ;; Random additional wait time for feed fetches.
-               :throttle-random-ms 1500
-               }
-}
-```
-
-## The Core Workflow: A Step-by-Step Guide
-
-The typical usage of `tract` is a cycle of processing known content and then discovering new content.
-
-#### Step 1: Launch the Authenticated Browser
-
-This is a one-time setup step per session. In a separate terminal, run:
+This is a one-time setup step per session. In a dedicated terminal window, run:
 ```bash
 make chrome
 ```
-A new Chrome window will open. In this window, **manually log into your Substack account**. You can then minimize this window and leave it running. `tract` will connect to it automatically.
+A new Chrome window will open. In this window, **manually log into your Substack account** and any other sites you wish to scrape. You can then minimize this window and leave it running in the background. `tract` will connect to it automatically.
 
-#### Step 2: Onboard a New Author (The Seed)
+## The Core Workflow: A Step-by-Step Guide
 
-To begin, you must tell `tract` about at least one author. Create a `.yaml` file in `work/job/pending/`. The pipeline will process any `.yaml` file it finds here.
+The typical usage of `tract` is a cycle of processing known content and then discovering new content linked from within it.
 
-**Example: `work/job/pending/new-author.yaml`**
+#### Step 1: Onboard a New Author (The Seed)
+To begin, you must tell `tract` about at least one author. Create a `.yaml` file in the `work/job/pending/` directory. The pipeline will process any `.yaml` file it finds here.
+
+**Example: `work/job/pending/add-new-author.yaml`**
 ```yaml
 # Fetch all articles from this author's RSS feed.
 # This works for standard *.substack.com domains and custom domains.
-author: "www.mind-war.com"
+author: "www.thebulwark.com"
 ```
 
-#### Step 3: Run the Pipeline
-
-Execute the main pipeline. It will find your job file, fetch the articles, and parse them into the final format.
+#### Step 2: Run the Pipeline
+Execute the main pipeline. It will find your job file, fetch any new articles, and parse them into the final format.
 ```bash
 make run
 ```
-After this completes, the `work/3-processed/` directory will contain your first set of articles, and `work/completed.log` will be populated.
+After this completes, the `work/3-processed/` directory will contain your first set of articles.
 
-#### Step 4: Discover New Articles
-
-Now, ask `tract` to scan the articles you just processed for links to new articles from authors you already follow.
+#### Step 3: Discover New Articles
+Now, ask `tract` to scan the articles you just processed for links to new, un-fetched articles. By default, it will only find new articles from authors already in your corpus.
 ```bash
 make discover
 ```
-This will create a new job file (e.g., `discovery-job-....yaml`) in `work/job/pending/`. By default, this job will only contain new articles from domains already present in your `completed.log`.
+This will create a new job file (e.g., `discovery-job-....yaml`) in `work/job/pending/`.
 
-#### Step 5: Run the Pipeline Again (The Cycle)
-
+#### Step 4: Run the Pipeline Again (The Cycle)
 Simply run the pipeline again:
 ```bash
 make run
@@ -103,72 +91,39 @@ It will automatically find the new job created by `discover` and process it. Thi
 
 ## Command Reference
 
+The `Makefile` provides simple, memorable commands for all major operations.
+
 ### Primary Makefile Commands
 
 | Command         | Description                                                                                             |
 | --------------- | ------------------------------------------------------------------------------------------------------- |
-| `make run`      | Runs the entire `job -> fetch -> parser` data processing pipeline.                                      |
-| `make discover` | Scans for new articles from known authors and creates a new job file.                                   |
-| `make prune`    | **(Dry Run)** Reports which files would be deleted based on the `ignored-domains.txt` list.             |
+| `make run`      | Runs the entire `job -> fetch -> parser` data processing pipeline. This is the main command you will use. |
+| `make discover` | Scans for new articles from known authors and creates a new job file in `work/job/pending/`.             |
+| `make prune`    | **(Dry Run)** Reports which files would be deleted based on `ignored-domains.txt`, without touching them. |
 | `make test`     | Runs the project's unit tests to verify core functionality.                                             |
-| `make chrome`   | Launches the persistent Chrome browser for `tract` to connect to.                                       |
+| `make chrome`   | Launches the persistent Chrome browser for `tract` to connect to for fetching.                          |
 
-### Advanced CLI Commands & Flags
+### Advanced CLI Flags
 
-For more control, you can invoke the Clojure runner directly.
+For more control, you can invoke the Clojure runner directly with flags.
 
 | Command                           | Description                                                                                                                             |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `clj -M:discover --expand`        | Runs the discovery tool in "expand" mode. This allows it to find and queue articles from **new domains** not yet in your `completed.log`. |
-| `clj -M:prune --force`            | Runs the prune utility and **permanently deletes** the files identified in the dry run. Use with caution.                                 |
-
-### Utility & Migration Scripts
-
-These scripts are located in the `scripts/` directory and are used for one-time data management tasks. They are run via `clj -M:[alias]`.
-
-| Command                           | Description                                                                                                       |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `make populate-completed-log`     | Scans all processed `.md` files and creates the initial `completed.log`. Essential for migrating from an older version. |
-| `make backfill-meta`              | Creates `.meta` files for existing data. Useful for data recovery and consistency checks.                             |
-| `clj -M:convert-fm`               | (Archive) Converts old TOML front matter to the new standard YAML format.                                         |
-
-## The `work/` Directory: A File System Map
-
-The `work/` directory is the heart of the pipeline. Its structure is:
-
--   `work/`
-    -   `completed.log`: The canonical, append-only log of all successfully processed article URLs. The system's "memory."
-    -   `external-links.csv`: A catalog of all outgoing external links found during discovery.
-    -   `job/`: The Job Stage
-        -   `pending/`: Place new `.yaml` job files here.
-        -   `done/`: Processed job files are moved here.
-        -   `error/`: Failed job files are moved here.
-    -   `fetch/`: The Fetch Stage
-        -   `pending/`: Contains `.txt` files with lists of URLs to fetch.
-        -   `done/`: Processed `.txt` files are moved here.
-        -   `error/`: `.txt` files that failed are moved here.
-    -   `parser/`: The Parser Stage
-        -   `pending/`: Contains raw `.html` files and their `.meta` companions waiting to be parsed.
-        -   `done/`: Successfully parsed `.html` and `.meta` files are moved here for archival.
-        -   `error/`: Failed `.html` files are moved here.
-    -   `3-processed/`: **Final Output Directory**
-        -   Contains the final, clean `.md` files and associated image assets for every successfully processed article.
+| `clj -M:discover --expand`        | Runs the discovery tool in "expand" mode. This allows it to find and queue articles from **new domains** not yet in your corpus.        |
+| `clj -M:prune-ignored --force`    | Runs the prune utility and **permanently deletes** the files identified in the dry run. Use with extreme caution.                           |
 
 ## Corpus Management
 
 You have several tools to control what content is added to and removed from your collection.
 
-#### Adding New Authors
+### Adding New Authors
+Create a new `.yaml` file in `work/job/pending/` with an `author:` key, as described in the Core Workflow.
 
-Create a new `.yaml` file in `work/job/pending/` with an `author:` key. Running `make run` will fetch their articles and add their domain to the list of "known domains," enabling future discovery.
+### Ignoring Domains
+To permanently prevent `tract` from discovering or processing content from specific domains, add them to `ignored-domains.txt` (one domain per line).
 
-#### Ignoring Domains
-
-To permanently prevent `tract` from discovering or processing content from specific domains, add them to `ignored-domains.txt` (one domain per line). This file is respected by both the `discover` and `prune` tools.
-
-#### Pruning Existing Data
-
-If you add a domain to `ignored-domains.txt` and want to remove any content you've *already* collected from that domain, use the `prune` tool.
+### Pruning Existing Data
+If you add a domain to `ignored-domains.txt` and want to remove content you've *already* collected from that domain, use the `prune` tool.
 
 1.  **Dry Run (Always do this first):**
     ```bash
@@ -179,6 +134,21 @@ If you add a domain to `ignored-domains.txt` and want to remove any content you'
 2.  **Execute Deletion:**
     Once you have reviewed the list and are certain, run the command with the `--force` flag:
     ```bash
-    clj -M:prune --force
+    clj -M:prune-ignored --force
     ```
-    This will permanently delete the associated `.md`, `.html`, and `.meta` files, and will also remove the corresponding URLs from `completed.log`.
+    This will permanently delete the associated `.md` and `.html` files, and will also remove all associated records from the system's logs.
+
+## The `work/` Directory: Understanding the Filesystem
+
+The `work/` directory is the heart of the pipeline. Its structure is designed for transparency.
+
+-   `work/`
+    -   `3-processed/`: **Final Output Directory.** Contains the final, clean `.md` files and associated image assets for every successfully processed article.
+    -   `metadata/`: A central store of all `.meta.json` files, containing the source URL and fetch time for every fetched article.
+    -   `parser/done/`: An archive of the raw `.html` source files for every successfully processed article. This is a core part of the "source of truth" for your corpus.
+    -   `job/`, `fetch/`, `parser/`: These directories contain `pending/`, `done/`, and `error/` subdirectories that show the state of the pipeline.
+    -   `completed-post-ids.log`: The canonical log of all completed article slugs (the system's primary "memory").
+    -   `url-to-id.map`: A lookup map connecting known URLs to their canonical slug.
+
+## A Note on Responsible Use
+`tract` is a powerful tool for personal archiving. You are responsible for using it ethically and in compliance with the terms of service for any website you scrape. Be a good web citizen: do not scrape excessively, and respect paywalls and copyrighted content.

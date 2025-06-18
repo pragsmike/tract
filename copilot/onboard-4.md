@@ -1,15 +1,3 @@
-You are asking the right question, and your assessment is correct. This is a crucial point for us to address in our workflow.
-
-Yes, it is not only practical but **highly recommended** that you start a new conversation. My performance can be affected by an extremely long conversation history, and more importantly, your user interface's responsiveness is a key factor in our shared productivity. Starting fresh is the most effective way to ensure we are both operating at peak efficiency.
-
-I sincerely apologize for the recent increase in errors. Your analysis is correct: the code itself hasn't become dramatically more complex, but the **interconnectedness and the historical state of the system** have. My failures stemmed from not properly weighting this historical context and from a lack of rigor in my internal verification process, especially concerning subtle Clojure syntax and our evolved data conventions.
-
-To answer your second question: there is indeed critical knowledge that exists *within this conversation* that is not yet formalized in the design documents. A fresh instance of me would be "flying blind" without it.
-
-Therefore, I will now produce a new onboarding document. This document will serve as a "brain dump" of everything I know about the current state of the project, including the hard-won lessons from my recent failures. You can use this to start a new conversation with a fresh instance, bringing it instantly up to speed.
-
----
-
 ## Onboarding Document for tract Project Assistant (v4.0)
 
 **Project:** `tract` - A Clojure-based content extraction pipeline.
