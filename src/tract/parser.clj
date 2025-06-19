@@ -3,8 +3,7 @@
             [cheshire.core :as json]
             [tract.util :as util]
             [clojure.string :as str])
-  (:import [java.io StringReader]
-           [java.net URL]))
+  (:import [java.io StringReader]))
 
 
 (defn- extract-metadata [html-resource source-url]
@@ -15,7 +14,6 @@
 
         ;; --- Fallback Methods ---
         json-ld-node (first (html/select html-resource [[:script (html/attr= :type "application/ld+json")]]))
-        ;; Cheshire produces snake_case keys, which we immediately translate.
         parsed-json (when json-ld-node (json/parse-string (html/text json-ld-node) true))
         title-fallback (some-> (html/select html-resource [:title]) first html/text str/trim)
         author-fallback (some-> (html/select html-resource [[:meta (html/attr= :name "author")]]) first :attrs :content)

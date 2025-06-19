@@ -26,7 +26,8 @@
         (str/split #"#" 2)
         first
         (str/split #"\?" 2)
-        first)))
+        first
+        )))
 
 ;; REMOVED: The `current-date-string` and `generate-article-key` functions
 ;; are no longer needed as the markdown filename is now based on the slug.

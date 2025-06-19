@@ -107,7 +107,7 @@
                 (let [link-path (.toPath symlink-file)
                       ;; The symlink is in .../parser/pending/, so we go up two levels.
                       relative-target (Paths/get "../../html" (.getName final-html-file))]
-                  (Files/createSymbolicLink link-path relative-target)
+                  (Files/createSymbolicLink link-path relative-target [])
                   (println (str "\t=> Created symlink for parser: " link-path))))
 
               (catch Exception e

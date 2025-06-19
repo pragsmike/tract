@@ -8,6 +8,7 @@
   (testing "Extraction of a slug from a URL"
     (is (= "my-great-article" (util/extract-slug-from-url "https://author.substack.com/p/my-great-article")))
     (is (= "article-with-slash" (util/extract-slug-from-url "https://author.substack.com/p/article-with-slash/")))
+    (is (= "article-with_under" (util/extract-slug-from-url "https://author.substack.com/p/article-with_under/")))
     (is (nil? (util/extract-slug-from-url "https://example.com/")))
     (is (nil? (util/extract-slug-from-url "not-a-valid-url")))
     (is (nil? (util/extract-slug-from-url nil)))))

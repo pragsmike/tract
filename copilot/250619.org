@@ -27,3 +27,22 @@ in any directory at the same level in the hierarchy.
 Do you see any problems with this approach?  What other things
 might break if the files in work/parser/* are symlinks rather than actual files?
 Will other namespaces beside fetch need to chage?  Any of the scripts?
+
+---
+
+Next let's make a script that verifies the integrity of the source-of-truth
+parts of the corpus: work/html and work/metadata.
+These are now immutable and the files won't move.
+The code takes great care not to put these in an inconsistent state,
+but it can still happen that html and metadata files don't both exist,
+or that their contents don't agree, for causes we can't control.
+Create a script that verifies this.
+Remember that all keys found in the metadata file are kebab case.
+Here's a sample:
+{
+  "source-url": "https://www.mind-war.com/p/why-is-a-canadian-it-guy-trying-to",
+  "fetch-timestamp": "2025-06-14T14:13:21.778821106Z"
+}
+and the corresponding html file has this directory listing:
+ ls -l work/html/why-is-a-canadian-it-guy-trying-to.html
+-rw-rw-r-- 1 mg mg 292036 Jun 14 10:13 work/html/why-is-a-canadian-it-guy-trying-to.html

@@ -23,6 +23,9 @@ recover-url-map:
 recover-md:
 	clj -M:recover-md
 
+verify-source:
+	clj -M:verify-source
+
 chrome:
 	google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-data &
 

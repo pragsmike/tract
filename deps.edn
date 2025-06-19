@@ -17,6 +17,7 @@
   :recover {:main-opts ["-m" "tract.recover"]}
 
   :prune-ignored {:main-opts ["-m" "prune-ignored"]}
+  :verify-source {:main-opts ["-m" "verify-source-integrity"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner
