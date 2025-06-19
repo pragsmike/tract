@@ -4,18 +4,21 @@
             [tract.util :as util]
             [tract.config :as config]
             [tract.db :as db]
+            [etaoin.api :as e]
             [clojure.string :as str]
-            [clojure.java.io :as io]
-            [cheshire.core :as json]
             [net.cgrand.enlive-html :as html]
-            [etaoin.api :as e])
+            [cheshire.core :as json]
+            [clojure.java.io :as io])
   (:import [java.io StringReader File]
-           [java.nio.file Files Paths]))
+           ;; Added Path for type hinting and clarity
+           [java.nio.file Files Path Paths]
+           ;; Added FileAttribute for the createSymbolicLink call
+           [java.nio.file.attribute FileAttribute]))
 
 (def ^:private stage-name :fetch)
 (def ^:private next-stage-name :parser)
 
- (defn- is-short-error-page? [html-string]
+(defn- is-short-error-page? [html-string]
   (let [html-len (count html-string)]
     (if (and html-string (> 5000 html-len))
       (try
@@ -31,7 +34,6 @@
     (+ base-wait random-jitter)))
 
 (defn- is-url-already-completed-in-db?
-  "Checks if a URL is already known and completed in the database."
   [url-str url->id-map completed-ids-set]
   (when-let [post-id (get url->id-map url-str)]
     (when (contains? completed-ids-set post-id)
@@ -59,7 +61,6 @@
         output-file (io/file metadata-dir filename)]
     (println (str "\t-> Writing metadata to " output-file))
     (spit output-file content)))
-
 
 (defn- process-url-list-file!
   [driver file url->id-map completed-ids-set ignored-domains-set]
@@ -104,11 +105,19 @@
 
                 (write-metadata-file! json-content meta-filename)
 
-                (let [link-path (.toPath symlink-file)
-                      ;; The symlink is in .../parser/pending/, so we go up two levels.
-                      relative-target (Paths/get "../../html" (.getName final-html-file))]
-                  (Files/createSymbolicLink link-path relative-target [])
-                  (println (str "\t=> Created symlink for parser: " link-path))))
+                ;; --- CORRECTED & ROBUST SYMLINK LOGIC ---
+                (let [;; The absolute path to the link we are creating
+                      ^Path link-path (.toPath symlink-file)
+                      ;; The absolute path to the file we are linking to
+                      ^Path dest-path (.toPath final-html-file)
+                      ;; The directory where the link will live
+                      ^Path link-dir-path (.getParent link-path)
+                      ;; Calculate the correct relative path from the link's dir to the target
+                      relative-target (.relativize link-dir-path dest-path)]
+                  (println (str "\t=> Created symlink for parser: " link-path " -> " relative-target))
+                  (Files/createSymbolicLink link-path
+                                            relative-target
+                                            (make-array FileAttribute 0))))
 
               (catch Exception e
                 (.delete temp-file)
@@ -120,9 +129,7 @@
                     (println (str "ERROR: Failed to process URL [" url "]. Skipping. Reason: " (.getMessage e)))))))))))
     (pipeline/move-to-done! file stage-name)))
 
-
 (defn run-stage!
-  "Main entry point for the fetch stage. Receives a pre-configured driver."
   [driver]
   (println "--- Running Fetch Stage ---")
   (let [pending-files (pipeline/get-pending-files stage-name)]
