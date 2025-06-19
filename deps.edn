@@ -17,14 +17,7 @@
   :recover {:main-opts ["-m" "tract.recover"]}
 
   :prune-ignored {:main-opts ["-m" "prune-ignored"]}
-  :recover-url-map {:main-opts ["-m" "recover-url-map"]}
-  :recover-md {:main-opts ["-m" "recover-md-front-matter"]}
-  :verify-corpus {:main-opts ["-m" "verify-corpus-integrity"]}
-  :repair-filenames {:main-opts ["-m" "repair-filenames"]}
-  :repair-conflicts {:main-opts ["-m" "repair-conflicts"]}
-  :repair-corpus {:main-opts ["-m" "repair-corpus"]}
-
-  :migrate-filenames {:main-opts ["-m" "migrate-filenames"]}
+  :migrate-html-locations {:main-opts ["-m" "migrate-html-locations"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner

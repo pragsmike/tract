@@ -1,0 +1,29 @@
+The next refactoring is to keep the HTML files in a directory work/html,
+similarly to how the metadata files are keps in work/metadata,
+where they will remain forever without being moved.
+Their names and contents will be the same as they are now.
+We must avoid having partial files, so the fetch stage must download
+to a temporary file, and only after it is known to be completely
+downloaded will we rename it into the work/html directory.
+
+The workflow is only slightly changed from what it is now. Instead of placing
+the html files into work/parser/pending, the fetch stage will leave the
+downloaded file in work/html, and it will then create a symlink to the
+downloaded file in work/parser/pending.
+
+I don't expect any changes to the parser stage, because it will
+be reading and renaming a symlink instead of the actual html file,
+but it won't know or care that it's a symlink.
+The parser will simply open the symlink, and the operating system will follow it automatically
+to provide the contents of the file.
+When the parser completes work on an HTML file, it moves the symlink
+to the work/parser/done or work/parser/error directory, as appropriate.
+The symlink will still point to the same file in work/html.
+
+We must take care to construct the symlink so that this is true.
+It could use a relative path, as it will then be valid if placed
+in any directory at the same level in the hierarchy.
+
+Do you see any problems with this approach?  What other things
+might break if the files in work/parser/* are symlinks rather than actual files?
+Will other namespaces beside fetch need to chage?  Any of the scripts?

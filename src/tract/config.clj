@@ -92,3 +92,8 @@
   "Returns the full path to the centralized metadata directory."
   []
   (str (io/file (work-dir) "metadata")))
+
+(defn html-dir-path
+  "Returns the full path to the permanent HTML asset directory."
+  []
+  (str (io/file (work-dir) "html")))

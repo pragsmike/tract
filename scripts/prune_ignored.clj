@@ -13,25 +13,28 @@
   (-> (.getName meta-file)
       (str/replace #"\.html\.meta\.json$" "")))
 
+;; REFACTORED: This function now targets the real HTML file in work/html/.
 (defn- find-prune-candidates [ignored-domains]
   (let [metadata-dir (io/file (config/metadata-dir-path))
         processed-dir (io/file (config/processed-dir-path))
-        parser-done-dir (io/file (config/stage-dir-path :parser "done"))
+        ;; ADDED: Get path to new permanent HTML directory.
+        html-dir (io/file (config/html-dir-path))
         meta-files (->> (.listFiles metadata-dir)
                         (filter #(str/ends-with? (.getName %) ".meta.json")))]
     (->> meta-files
          (map (fn [meta-file]
                 (try
                   (let [meta-data (json/parse-string (slurp meta-file) true)
-                        ;; CORRECTED: Use mandatory kebab-case key for access.
                         source-url (:source-url meta-data)
                         domain (util/extract-domain source-url)]
                     (when (and source-url (contains? ignored-domains domain))
-                      (let [slug (get-slug-from-meta-filename meta-file)]
+                      (let [slug (get-slug-from-meta-filename meta-file)
+                            html-file-path (.getPath (io/file html-dir (str slug ".html")))]
                         {:slug slug
                          :source-url source-url
+                         ;; MODIFIED: List of files to delete now points to work/html/.
                          :files-to-delete [(.getPath meta-file)
-                                           (.getPath (io/file parser-done-dir (str slug ".html")))
+                                           html-file-path
                                            (.getPath (io/file processed-dir (str slug ".md")))]})))
                   (catch Exception e
                     (println (str "\nWARN: Could not parse " (.getName meta-file) ". Skipping."))
@@ -39,6 +42,9 @@
          (remove nil?)
          (doall))))
 
+;; ... (perform-dry-run and perform-delete! do not need to change, as they
+;;      operate on the list of files generated above.)
+;; ... (The rest of the file remains the same)
 (defn- perform-dry-run [candidates]
   (println "\n--- DRY RUN: The following files and their data would be pruned ---")
   (if (empty? candidates)
@@ -88,7 +94,7 @@
 
 (defn -main [& args]
   (let [force-mode? (some #{"--force" "--delete"} args)]
-    (println "--- Pruning Utility for Ignored Domains (v2.1-refactored) ---")
+    (println "--- Pruning Utility for Ignored Domains (v2.2-symlink-aware) ---")
     (let [ignored-domains (db/read-ignore-list)]
       (println (str "-> Loaded " (count ignored-domains) " domains from " (config/ignored-domains-path)))
       (println "-> Scanning metadata for matching files...")
