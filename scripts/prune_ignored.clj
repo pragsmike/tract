@@ -9,16 +9,10 @@
             [cheshire.core :as json])
   (:gen-class))
 
-(defn- get-slug-from-meta-filename [^java.io.File meta-file]
-  (-> (.getName meta-file)
-      (str/replace #"\.html\.meta\.json$" "")))
-
-;; REFACTORED: This function now targets the real HTML file in work/html/.
 (defn- find-prune-candidates [ignored-domains]
   (let [metadata-dir (io/file (config/metadata-dir-path))
-        processed-dir (io/file (config/processed-dir-path))
-        ;; ADDED: Get path to new permanent HTML directory.
         html-dir (io/file (config/html-dir-path))
+        processed-dir (io/file (config/processed-dir-path))
         meta-files (->> (.listFiles metadata-dir)
                         (filter #(str/ends-with? (.getName %) ".meta.json")))]
     (->> meta-files
@@ -28,7 +22,7 @@
                         source-url (:source-url meta-data)
                         domain (util/extract-domain source-url)]
                     (when (and source-url (contains? ignored-domains domain))
-                      (let [slug (get-slug-from-meta-filename meta-file)
+                      (let [slug (util/get-slug-from-meta-filename meta-file)
                             html-file-path (.getPath (io/file html-dir (str slug ".html")))]
                         {:slug slug
                          :source-url source-url
@@ -42,9 +36,6 @@
          (remove nil?)
          (doall))))
 
-;; ... (perform-dry-run and perform-delete! do not need to change, as they
-;;      operate on the list of files generated above.)
-;; ... (The rest of the file remains the same)
 (defn- perform-dry-run [candidates]
   (println "\n--- DRY RUN: The following files and their data would be pruned ---")
   (if (empty? candidates)

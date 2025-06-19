@@ -17,7 +17,6 @@
   :recover {:main-opts ["-m" "tract.recover"]}
 
   :prune-ignored {:main-opts ["-m" "prune-ignored"]}
-  :migrate-html-locations {:main-opts ["-m" "migrate-html-locations"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner

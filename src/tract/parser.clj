@@ -1,21 +1,17 @@
 (ns tract.parser
   (:require [net.cgrand.enlive-html :as html]
             [cheshire.core :as json]
+            [tract.util :as util]
             [clojure.string :as str])
   (:import [java.io StringReader]
            [java.net URL]))
 
-(defn- extract-slug-from-url [url-str]
-  (when-let [path (try (.getPath (new URL url-str)) (catch Exception _ nil))]
-    (-> (str/split path #"/")
-        last)))
 
 (defn- extract-metadata [html-resource source-url]
   (let [;; --- NEW PRIMARY METHOD: Find Canonical URL and extract slug ---
         canonical-url (some-> (html/select html-resource [[:link (html/attr= :rel "canonical")]])
                               first :attrs :href)
-        ;; The Canonical ID is the slug from the canonical URL.
-        canonical-id (extract-slug-from-url canonical-url)
+        canonical-id (util/extract-slug-from-url canonical-url)
 
         ;; --- Fallback Methods ---
         json-ld-node (first (html/select html-resource [[:script (html/attr= :type "application/ld+json")]]))

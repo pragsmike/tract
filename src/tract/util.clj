@@ -3,6 +3,21 @@
   (:import [java.net URL URLDecoder]
            [java.io File]))
 
+(defn extract-slug-from-url
+  "Extracts the final path segment (the slug) from a URL string."
+  [url-str]
+  (when-let [path (try (.getPath (new URL url-str)) (catch Exception _ nil))]
+    (-> (str/split path #"/")
+        last)))
+
+(defn get-slug-from-meta-filename
+  "Extracts the slug from a metadata file's File object or filename string."
+  [meta-file-or-name]
+  (let [file-name (if (instance? File meta-file-or-name)
+                    (.getName ^File meta-file-or-name)
+                    (str meta-file-or-name))]
+    (str/replace file-name #"\.html\.meta\.json$" "")))
+
 (defn canonicalize-url
   "Removes query parameters and fragments from a URL string."
   [url-str]

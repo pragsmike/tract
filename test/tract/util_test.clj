@@ -1,8 +1,33 @@
 (ns tract.util-test
   (:require [clojure.test :refer :all]
             [tract.util :as util]
-            [clojure.string :as str])
+            [clojure.java.io :as io])
   (:import [java.io File]))
+
+(deftest extract-slug-from-url-test
+  (testing "Extraction of a slug from a URL"
+    (is (= "my-great-article" (util/extract-slug-from-url "https://author.substack.com/p/my-great-article")))
+    (is (= "article-with-slash" (util/extract-slug-from-url "https://author.substack.com/p/article-with-slash/")))
+    (is (nil? (util/extract-slug-from-url "https://example.com/")))
+    (is (nil? (util/extract-slug-from-url "not-a-valid-url")))
+    (is (nil? (util/extract-slug-from-url nil)))))
+
+(deftest get-slug-from-meta-filename-test
+  (testing "Extraction of a slug from a metadata filename"
+    (testing "from a string"
+      (is (= "my-article-slug" (util/get-slug-from-meta-filename "my-article-slug.html.meta.json"))))
+    (testing "from a File object"
+      (is (= "another-slug" (util/get-slug-from-meta-filename (io/file "work/metadata/another-slug.html.meta.json")))))
+    (testing "with an empty string"
+      (is (= "" (util/get-slug-from-meta-filename ""))))))
+
+(deftest extract-domain-test
+  (testing "Extraction of a domain from a URL string"
+    (is (= "www.example.com" (util/extract-domain "https://www.example.com/path/to/page")))
+    (is (= "sub.domain.co.uk" (util/extract-domain "http://sub.domain.co.uk?query=1")))
+    (is (nil? (util/extract-domain "www.missing-protocol.com")))
+    (is (nil? (util/extract-domain "not a url")))
+    (is (nil? (util/extract-domain nil)))))
 
 (deftest canonicalize-url-test
   (testing "Canonicalization of URLs"
@@ -12,37 +37,6 @@
     (is (= "https://example.com/page" (util/canonicalize-url "https://example.com/page")))
     (is (nil? (util/canonicalize-url nil)))
     (is (= "" (util/canonicalize-url "")))))
-
-(deftest generate-article-key-test
-  (testing "Generation of file-safe article keys"
-    (testing "with full metadata"
-      (let [metadata {:publication_date "2023-10-27", :title "My Awesome Post!"}]
-        (is (= "2023-10-27_my-awesome-post" (util/generate-article-key metadata)))))
-
-    (testing "with a long title"
-      (let [metadata {:publication_date "2023-10-27"
-                      :title "This is a very very long title that absolutely must be truncated for filesystem safety"}
-            generated-key (util/generate-article-key metadata)]
-        ;; vvvv CORRECTED ASSERTION vvvv
-        (is (= "2023-10-27_this-is-a-very-very-long-title-that-absolutely-mus"
-               generated-key))
-        ;; Also make this assertion more precise. 10(date) + 1(_) + 50(slug) = 61
-        (is (= 61 (count generated-key)))))
-        ;; ^^^^ CORRECTED ASSERTION ^^^^
-
-    (testing "with only a date"
-      (let [metadata {:publication_date "2023-10-27"}]
-        (is (= "2023-10-27_untitled" (util/generate-article-key metadata)))))
-
-    (testing "with only a title"
-      (with-redefs [tract.util/current-date-string (fn [] "2025-01-01")]
-        (let [metadata {:title "A Title With No Date"}]
-          (is (= "2025-01-01_a-title-with-no-date" (util/generate-article-key metadata))))))
-
-    (testing "with no metadata"
-      (with-redefs [tract.util/current-date-string (fn [] "2025-01-01")]
-        (let [metadata {}]
-          (is (= "2025-01-01_untitled" (util/generate-article-key metadata))))))))
 
 (deftest url->local-path-test
   (testing "Conversion of image URLs to local file paths"
@@ -75,6 +69,8 @@
              (util/url->filename "https://www.custom.com/p/another-great-article"))))
 
     (testing "a URL with a trailing slash"
+      ;; The slug extraction would be "article-with-slash", but this function is dumber
+      ;; and replaces non-alnum characters, so the trailing / becomes _.
       (is (= "article-with-slash_.html"
              (util/url->filename "https://author.substack.com/p/article-with-slash/"))))
 
