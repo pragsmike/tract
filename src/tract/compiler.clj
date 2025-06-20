@@ -52,42 +52,32 @@
         :blockquote {:markdown (str "\n> " (str/replace content-md #"\n" "\n> ") "\n"), :images child-images}
         {:markdown content-md, :images child-images}))))
 
-
-;; --- NEW HELPER and UPDATED FORMATTER ---
-
 (defn- format-yaml-front-matter
   "Takes a metadata map and returns a YAML front matter string."
   [metadata]
   (let [;; CORRECTED: Select and order kebab-case keys for consistent output.
-        ;; ADDED :post-id to the list of keys to write.
-        front-matter-data (select-keys metadata [:title :author :publication-date :source-url :post-id :article-key])
+        front-matter-data (select-keys metadata [:title
+                                                 :author
+                                                 :publication-date
+                                                 :source-url
+                                                 :canonical-url
+                                                 :fetch-timestamp
+                                                 :post-id
+                                                 :article-key])
         yaml-string (yaml/generate-string front-matter-data
                                           :dumper-options {:flow-style :block})]
     (str "---\n"
          yaml-string
          "---\n\n")))
 
-
 (defn compile-to-article
   "Takes parsed data and returns a map of final article data and image jobs."
-  [{:keys [metadata body-nodes]}]
-  ;; REFACTORED: The article-key is now the canonical slug (:post-id).
-  (let [article-key (let [slug (:post-id metadata)]
-                      (if (str/blank? slug)
-                        (str "unknown-article_" (System/currentTimeMillis))
-                        slug))
-
-        ;; CORRECTED: Use kebab-case keys for all metadata access and creation.
-        full-metadata (assoc metadata
-                             :title (or (:title metadata) "Untitled")
-                             :publication-date (or (:publication-date metadata) "unknown")
-                             :source-url (or (:source-url metadata) "unknown")
-                             :article-key article-key)
+  [metadata body-nodes]
+  (let [article-key (:article-key metadata)
         {:keys [markdown images]} (process-node {:tag :div :content body-nodes} article-key)
         final-markdown (-> markdown
                            (str/replace #"(?m)^\s*$\n" "")
                            str/trim)
-        front-matter (format-yaml-front-matter full-metadata)]
-    {:article {:metadata full-metadata
-               :markdown (str front-matter final-markdown)}
+        front-matter (format-yaml-front-matter metadata)]
+    {:markdown (str front-matter final-markdown)
      :images images}))

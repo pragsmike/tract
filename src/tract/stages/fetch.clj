@@ -11,7 +11,7 @@
             [clojure.java.io :as io])
   (:import [java.io StringReader File]
            ;; Added Path for type hinting and clarity
-           [java.nio.file Files Path Paths]
+           [java.nio.file Files Path]
            ;; Added FileAttribute for the createSymbolicLink call
            [java.nio.file.attribute FileAttribute]))
 

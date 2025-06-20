@@ -6,7 +6,7 @@
   (:import [java.io StringReader]))
 
 
-(defn- extract-metadata [html-resource source-url]
+(defn- extract-metadata [html-resource]
   (let [;; --- NEW PRIMARY METHOD: Find Canonical URL and extract slug ---
         canonical-url (some-> (html/select html-resource [[:link (html/attr= :rel "canonical")]])
                               first :attrs :href)
@@ -24,8 +24,7 @@
     {:title            (or (:headline parsed-json) title-fallback)
      :author           (or (get-in parsed-json [:author 0 :name]) author-fallback "unknown")
      :publication-date (or (some-> (:datePublished parsed-json) (subs 0 10)) date-fallback)
-     :source-url       source-url
-     :canonical-url    (or canonical-url source-url)
+     :canonical-url    canonical-url
      :post-id          canonical-id})) ; The post-id is the canonical slug.
 
 (defn- extract-body-nodes [html-resource]
@@ -37,7 +36,7 @@
 (defn parse-html
   "Takes an HTML string and its original source URL,
   and returns a map of {:metadata ... :body-nodes ...}"
-  [html-string source-url]
+  [html-string]
   (let [html-resource (html/html-resource (StringReader. html-string))]
-    {:metadata   (extract-metadata html-resource source-url)
+    {:metadata   (extract-metadata html-resource)
      :body-nodes (extract-body-nodes html-resource)}))

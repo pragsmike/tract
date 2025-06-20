@@ -18,7 +18,7 @@
 
 (defn write-article!
   "Writes the complete article markdown file."
-  [{:keys [markdown output-file]}]
+  [output-file markdown]
   (println "-> Writing article to:" output-file)
   (spit output-file markdown))
 
