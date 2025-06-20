@@ -11,7 +11,7 @@
   (:import [java.io StringReader]
            [java.net URL MalformedURLException]))
 
-(def ^:private parser-done-dir (config/stage-dir-path :parser "done"))
+(def ^:private html-dir (config/html-dir-path))
 (def ^:private fetch-pending-dir (config/stage-dir-path :fetch "pending"))
 (def ^:private fetch-done-dir (config/stage-dir-path :fetch "done"))
 (def ^:private external-links-db-file (config/external-links-csv-path))
@@ -122,7 +122,7 @@
       (println (str "-> Restricting discovery to " (count known-domains) " known domains.")))
 
     (println "\n-> Scanning processed HTML files for new links...")
-    (let [html-files (->> (io/file parser-done-dir) file-seq (filter #(.isFile %)))
+    (let [html-files (->> (io/file html-dir) file-seq (filter #(.isFile %)))
           unfiltered-links (for [html-file html-files
                                  :let [source-key (-> (.getName html-file) (str/replace #"\.html$" ""))]
                                  link (extract-links-from-html html-file)]

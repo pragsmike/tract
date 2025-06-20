@@ -1,0 +1,62 @@
+Turn now to the problem of database file integrity.
+Recall that the database files are
+   * url-to-id.map
+   * completed-post-ids.log
+   * external-links.csv
+First, make a table showing which stages write these files, and which namespaces do so,
+and which stages read these files, and which namespaces do that.
+
+---
+
+I'm concerned that these files may have been corrupted because of previously faulty code.
+I think that we can regenerate them using the source of truth files (html+meta) and the markdown files.
+Do you agree?
+
+---
+Let's define some terms.  These are supposed to be consistent with what the code currently calls them.
+
+  * "given URL" is what is specified by the user, in a job file (job/pending) or url list (fetch/pending).
+  * "source URL" is where the document actually got fetched from (after any redirections).
+  * "canonical URL" is what the document link rel=canonical contains, only known after parsing HTML.
+
+Below I state some concerns and ask for your analysis of the existing code to answer certain questions.
+
+** URLs known in the fetch stage
+
+  The html and metadata files (html+meta) are given names that are derived from the given URL
+  that the document is fetched from (the source-url).  There is no other choice in the fetch stage,
+  because the HTML document has not yet been parsed hence the canonical URL is not known.
+
+  I suppose the fetch stage could navigate to the given URL, then ask the browser for the source URL.
+  Is this in fact what it does?
+
+** URLs known in the parser stage
+
+  The markdown file is given a name that is derived from the canonical URL, in the parser stage
+  where that name is now known.
+  Or is that in fact the case?
+
+** Concerns over URL mismatches
+
+  * The decision to skip an already-fetched document is made based on the given
+    URL. If the record of the document being fetched holds only the source URL
+    and canonical URLs, then and the given URL is not equal to the source URL
+    (due to a redirect) then it will never be skipped.
+
+  * The html+meta files may end up with a different name than the markdown file
+    derived from them, because the former is decided at fetch time, when only
+    the given (and possibly source) URL was known, and the latter is decided
+    at parser time, after the canonical URL was known.
+
+  Analyse the code to determine whether it is vulnerable to these problem.
+
+---
+It may still be the case the same article will be requested via two different URLs,
+and will then cause two different html+meta file pairs to be created based on the
+given URL.  This won't be detected until parse time, when the logic could decide
+1) not to proceed with markdown generation on the later duplicate and 2) to discard
+the later duplicate.
+
+What are the pros and cons of capturing the source URL from the browser at the same
+time it captures the page content?  This be stored in the metadata file.
+All three URLs could be stored in the completion record after a successful parse.

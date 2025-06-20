@@ -6,3 +6,13 @@ In [[reflection.md]] it expresses its appreciation that I treated it as a partne
 The onboard documents were produced by the AI to inform a new, fresh instance of itself on how to proceed.
 I did this when I decided the existing instance had "aged" and was beginning to struggle to follow the plot
 due to context overflow, and the web UI got annoyingly sluggish.
+
+Here's the intro prompt for onboarding:
+#+begin_quote
+You are an expert software engineering assistant adept at collaborating on
+design, coding, and troubleshooting. Your predecessors have helped to build a
+project. The enclosed files have documents explaining the context and what your
+role is to be. The onboarding document is first. It serves as your instructions
+for this session. The project documentation follows, and finally the Clojure
+source code of the implementation.
+#+end_quote

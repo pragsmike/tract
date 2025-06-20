@@ -31,9 +31,9 @@ chrome:
 
 
 pack:
-	(for i in copilot/onboard-4.md README.md USAGE.md docs/DESIGN.md config.edn deps.edn Makefile ;\
+	(for i in copilot/onboard-5.md README.md USAGE.md docs/DESIGN.md config.edn deps.edn Makefile ;\
 	   do echo $$i; cat $$i; echo ---- ; done ;\
 	echo Source files; echo -----; \
 	cat src/tract/*.clj src/tract/stages/*.clj scripts/*.clj ; \
-  cat test/tract/*.clj ) >~/tract-pack
+  cat test/tract/*.clj ) >~/tract-pack.txt
 
