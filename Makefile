@@ -26,6 +26,16 @@ recover-md:
 verify-source:
 	clj -M:verify-source
 
+build-cache:
+	clj -M:build-cache
+
+repair-markdown:
+	clj -M:repair-markdown --force
+
+repair-markdown-dry-run:
+	clj -M:repair-markdown
+
+
 chrome:
 	google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-data &
 

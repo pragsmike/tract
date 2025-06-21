@@ -60,3 +60,18 @@ the later duplicate.
 What are the pros and cons of capturing the source URL from the browser at the same
 time it captures the page content?  This be stored in the metadata file.
 All three URLs could be stored in the completion record after a successful parse.
+
+---
+Turn now to use cases for the processed markdown.
+Here "articles" means the markdown file.
+I want to create subsets of articles, such as
+articles by a given author,
+articles from a given domain,
+articles published within a range of dates,
+or some combination of these constraints.
+
+Envision an operation whose input is such a query,
+and output is a directory
+containing symlinks to the selected articles.
+
+How could we implement this in the current system?

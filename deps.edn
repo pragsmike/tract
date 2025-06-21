@@ -18,6 +18,8 @@
 
   :prune-ignored {:main-opts ["-m" "prune-ignored"]}
   :verify-source {:main-opts ["-m" "verify-source-integrity"]}
+  :repair-markdown {:main-opts ["-m" "repair-markdown"]}
+  :build-cache {:main-opts ["-m" "build-metadata-cache"]}
 
   :test {:extra-paths ["src" "test"]
          :extra-deps {io.github.cognitect-labs/test-runner

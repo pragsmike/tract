@@ -1,4 +1,3 @@
-;; File: src/tract/stages/parser.clj
 (ns tract.stages.parser
   (:require [tract.pipeline :as pipeline]
             [tract.parser :as parser-logic]
@@ -40,26 +39,38 @@
 
 (defn- process-html-file!
   "Processes a single HTML file from the pending directory."
-  [html-file]
+  [html-file completed-ids-set]
   (println (str "-> Processing HTML file: " (.getName html-file)))
   (try
     (let [{:keys [metadata body-nodes]} (parser-logic/parse-html (slurp html-file))
           fetcher-meta-data (->fetcher-metadata (.getName html-file))
           metadata (full-metadata metadata fetcher-meta-data)
-          {:keys [markdown images]} (compiler/compile-to-article metadata body-nodes)
-          output-path (jio/file output-dir)]
+          post-id (:post-id metadata)]
 
-      (.mkdirs output-path)
-      (let [md-file (jio/file output-path (str (:article-key metadata) ".md"))]
-        (io/write-article! md-file markdown))
+      (if (and post-id (contains? completed-ids-set post-id))
+        ;; Case: Article is a duplicate.
+        (do
+          (println (str "\t-> Duplicate article found (ID: " post-id ")."))
+          (println "\t-> Updating URL map and skipping re-compilation.")
+          (db/record-completion! (select-keys metadata [:post-id :source-url :canonical-url])))
 
-      (println (str "\t-> Processing " (count images) " images for " (:article-key metadata)))
-      (doseq [job images]
-        (let [job-with-output-dir (update job :image-path #(jio/file output-path %))]
-          (io/download-image! job-with-output-dir)))
+        ;; Case: Article is new.
+        (do
+          (println (str "\t-> New article (ID: " post-id "). Compiling to Markdown."))
+          (let [{:keys [markdown images]} (compiler/compile-to-article metadata body-nodes)
+                output-path (jio/file output-dir)]
 
-      (db/record-completion! (select-keys metadata [:post-id :source-url :canonical-url])))
+            (.mkdirs output-path)
+            (let [md-file (jio/file output-path (str (:article-key metadata) ".md"))]
+              (io/write-article! md-file markdown))
 
+            (println (str "\t-> Processing " (count images) " images for " (:article-key metadata)))
+            (doseq [job images]
+              (let [job-with-output-dir (update job :image-path #(jio/file output-path %))]
+                (io/download-image! job-with-output-dir)))
+
+            (db/record-completion! (select-keys metadata [:post-id :source-url :canonical-url])))))
+      )
     (pipeline/move-to-done! html-file stage-name)
     (catch Exception e
       (pipeline/move-to-error! html-file stage-name e))))
@@ -73,6 +84,9 @@
       (println "No HTML files to process.")
       (do
         (println "Found" (count pending-files) "HTML file(s).")
-        (doseq [file pending-files]
-          (process-html-file! file)))))
+        ;; Optimization: Load the completed IDs set once for the entire batch.
+        (let [completed-ids (db/read-completed-post-ids)]
+          (println (str "-> Loaded " (count completed-ids) " completed article IDs for de-duplication."))
+          (doseq [file pending-files]
+            (process-html-file! file completed-ids))))))
   (println "--- Parser Stage Complete ---"))
