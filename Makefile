@@ -29,6 +29,10 @@ verify-source:
 build-cache:
 	clj -M:build-cache
 
+query:
+	@echo "Usage: clj -M:query --option <value> ... --output-dir <dir>"
+	@echo "Example: clj -M:query --author \"Jane Doe\" --output-dir results"
+
 repair-markdown:
 	clj -M:repair-markdown --force
 
